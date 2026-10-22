@@ -49,16 +49,22 @@ export const db = {
     return state.categories.some((category) => category.id === id)
   },
 
+  /** Grouped by category in the categories' order; within a category, in the order they were added. */
   listMenuItems(filter: MenuItemFilter): MenuItem[] {
     const query = filter.q?.trim().toLowerCase() ?? ''
-    return state.menuItems.filter(
-      (item) =>
-        (filter.includeUnavailable || item.available) &&
-        (filter.categoryId === undefined || item.categoryId === filter.categoryId) &&
-        (query === '' ||
-          item.name.toLowerCase().includes(query) ||
-          item.description.toLowerCase().includes(query)),
+    const categoryRank = new Map(
+      state.categories.map((category) => [category.id, category.sortOrder]),
     )
+    return state.menuItems
+      .filter(
+        (item) =>
+          (filter.includeUnavailable || item.available) &&
+          (filter.categoryId === undefined || item.categoryId === filter.categoryId) &&
+          (query === '' ||
+            item.name.toLowerCase().includes(query) ||
+            item.description.toLowerCase().includes(query)),
+      )
+      .sort((a, b) => (categoryRank.get(a.categoryId) ?? 0) - (categoryRank.get(b.categoryId) ?? 0))
   },
 
   getMenuItem(id: string): MenuItem | undefined {

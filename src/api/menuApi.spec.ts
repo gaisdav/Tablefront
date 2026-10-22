@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { menuApi } from '@/api/menuApi'
+import { menuItems } from '@/mocks/fixtures'
 import { signInAsAdmin } from '@/test/helpers'
+
+const availableCount = menuItems.filter((item) => item.available).length
 
 describe('menuApi.listCategories', () => {
   it('returns categories sorted by sortOrder', async () => {
@@ -19,7 +22,7 @@ describe('menuApi.listMenuItems', () => {
   it('hides unavailable items from guests', async () => {
     const items = await menuApi.listMenuItems()
 
-    expect(items).toHaveLength(17)
+    expect(items).toHaveLength(availableCount)
     expect(items.every((item) => item.available)).toBe(true)
   })
 
@@ -28,17 +31,34 @@ describe('menuApi.listMenuItems', () => {
 
     const items = await menuApi.listMenuItems()
 
-    expect(items).toHaveLength(19)
+    expect(items).toHaveLength(menuItems.length)
     expect(items.filter((item) => !item.available).map((item) => item.name)).toEqual([
       'Lasagna',
       'Chocolate fondant',
     ])
   })
 
+  it("lists dishes grouped by category, in the categories' order", async () => {
+    const [items, categories] = await Promise.all([
+      menuApi.listMenuItems(),
+      menuApi.listCategories(),
+    ])
+
+    const order = categories.map((category) => category.id)
+    const ranks = items.map((item) => order.indexOf(item.categoryId))
+
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b))
+    expect(ranks.every((rank) => rank >= 0)).toBe(true)
+  })
+
   it('filters by category', async () => {
     const items = await menuApi.listMenuItems({ categoryId: 'cat-desserts' })
 
-    expect(items.map((item) => item.name)).toEqual(['Tiramisu', 'Panna cotta', 'Pistachio gelato'])
+    expect(items.map((item) => item.name)).toEqual([
+      'Tiramisu',
+      'Schwarzwälder Kirschtorte',
+      'Apfelstrudel',
+    ])
   })
 
   it('matches the search text against names, case-insensitively', async () => {
@@ -62,6 +82,6 @@ describe('menuApi.listMenuItems', () => {
   it('ignores an empty search', async () => {
     const items = await menuApi.listMenuItems({ q: '   ' })
 
-    expect(items).toHaveLength(17)
+    expect(items).toHaveLength(availableCount)
   })
 })

@@ -4,11 +4,13 @@ import { createMemoryHistory, type Router } from 'vue-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '@/App.vue'
 import { setMockConditions } from '@/mocks/conditions'
+import { menuItems } from '@/mocks/fixtures'
 import { server } from '@/mocks/server'
 import { createAppRouter } from '@/router'
 import type { MenuItem } from '@/types/domain'
 
 const mounted: VueWrapper[] = []
+const availableCount = menuItems.filter((item) => item.available).length
 
 async function mountMenu(path = '/'): Promise<{ wrapper: VueWrapper; router: Router }> {
   const router = createAppRouter(createMemoryHistory())
@@ -65,7 +67,7 @@ describe('MenuPage: loading and content', () => {
 
     await untilLoaded(wrapper)
 
-    expect(wrapper.findAll('.card')).toHaveLength(17)
+    expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     expect(wrapper.find('.skeleton').exists()).toBe(false)
     expect(wrapper.findAll('.chip').map((button) => button.text())).toEqual([
       'All',
@@ -93,7 +95,7 @@ describe('MenuPage: category filter', () => {
 
     await chip(wrapper, 'Desserts').trigger('click')
     await vi.waitFor(() => {
-      expect(names(wrapper)).toEqual(['Tiramisu', 'Panna cotta', 'Pistachio gelato'])
+      expect(names(wrapper)).toEqual(['Tiramisu', 'Schwarzwälder Kirschtorte', 'Apfelstrudel'])
     })
 
     expect(router.currentRoute.value.query).toEqual({ category: 'cat-desserts' })
@@ -107,7 +109,7 @@ describe('MenuPage: category filter', () => {
 
     await chip(wrapper, 'All').trigger('click')
     await vi.waitFor(() => {
-      expect(wrapper.findAll('.card')).toHaveLength(17)
+      expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     })
 
     expect(router.currentRoute.value.query).toEqual({})
@@ -129,7 +131,7 @@ describe('MenuPage: category filter', () => {
       expect(wrapper.find('.is-refreshing').exists()).toBe(true)
     })
 
-    expect(wrapper.findAll('.card')).toHaveLength(17)
+    expect(wrapper.findAll('.card')).toHaveLength(availableCount)
 
     await vi.waitFor(() => {
       expect(names(wrapper)).toEqual(['Tea'])
@@ -275,7 +277,7 @@ describe('MenuPage: empty results', () => {
     const clear = wrapper.findAll('button').find((button) => button.text() === 'Clear filters')
     await clear?.trigger('click')
     await vi.waitFor(() => {
-      expect(wrapper.findAll('.card')).toHaveLength(17)
+      expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     })
 
     expect(router.currentRoute.value.query).toEqual({})
@@ -305,7 +307,7 @@ describe('MenuPage: errors', () => {
     setMockConditions({ errorRate: 'off' })
     await wrapper.get('[role="alert"] button').trigger('click')
     await vi.waitFor(() => {
-      expect(wrapper.findAll('.card')).toHaveLength(17)
+      expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     })
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
@@ -321,7 +323,7 @@ describe('MenuPage: errors', () => {
 
     await untilLoaded(wrapper)
 
-    expect(wrapper.findAll('.card')).toHaveLength(17)
+    expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     expect(wrapper.text()).toContain('Categories could not be loaded')
   })
 
