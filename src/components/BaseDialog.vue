@@ -5,7 +5,11 @@ import { getFocusable, useFocusTrap } from '@/composables/useFocusTrap'
 import { useScrollLock } from '@/composables/useScrollLock'
 
 const open = defineModel<boolean>('open', { required: true })
-const { title } = defineProps<{ title: string }>()
+const { title, placement = 'center' } = defineProps<{
+  title: string
+  /** `side`: a panel from the right edge on tablet and up (a cart, a filter drawer). Always a bottom sheet on a phone. */
+  placement?: 'center' | 'side'
+}>()
 
 defineSlots<{
   default(): unknown
@@ -50,12 +54,14 @@ function onBackdropMouseup(event: MouseEvent): void {
       <div
         v-if="open"
         class="backdrop"
+        :class="{ 'backdrop--side': placement === 'side' }"
         @mousedown="onBackdropMousedown"
         @mouseup="onBackdropMouseup"
       >
         <div
           ref="panel"
           class="panel"
+          :class="{ 'panel--side': placement === 'side' }"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="titleId"
@@ -137,6 +143,7 @@ function onBackdropMouseup(event: MouseEvent): void {
 
 .panel__content {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 0;
 }
@@ -163,6 +170,24 @@ function onBackdropMouseup(event: MouseEvent): void {
   .panel {
     width: min(32rem, calc(100% - 2 * var(--gutter)));
     border-radius: var(--radius-lg);
+  }
+
+  .backdrop--side {
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+
+  .panel--side {
+    width: min(28rem, 100%);
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  }
+
+  .dialog-enter-from .panel--side,
+  .dialog-leave-to .panel--side {
+    transform: translateX(100%);
   }
 }
 

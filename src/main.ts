@@ -1,3 +1,4 @@
+import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import App from '@/App.vue'
 import { createAppRouter } from '@/router'
@@ -24,7 +25,7 @@ async function bootstrap(): Promise<void> {
       console.warn('The mock API could not start; requests will reach the real network.', error)
     }
   }
-  createApp(App).use(createAppRouter()).mount('#app')
+  createApp(App).use(createPinia()).use(createAppRouter()).mount('#app')
 }
 
 void bootstrap()

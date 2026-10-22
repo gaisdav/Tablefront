@@ -85,6 +85,28 @@ describe('BaseDialog', () => {
   })
 })
 
+describe('BaseDialog placement', () => {
+  it('is a centred dialog by default', () => {
+    openDialog()
+
+    expect(dialog()?.classList.contains('panel--side')).toBe(false)
+  })
+
+  it('can be a side panel, for a cart or a filter drawer', () => {
+    opener = document.createElement('button')
+    document.body.append(opener)
+    const wrapper = mount(BaseDialog, {
+      props: { open: true, title: 'Your order', placement: 'side' },
+      slots: { default: () => h('p', 'Content') },
+      attachTo: document.body,
+    })
+    mounted.push(wrapper)
+
+    expect(dialog()?.classList.contains('panel--side')).toBe(true)
+    expect(dialog()?.parentElement?.classList.contains('backdrop--side')).toBe(true)
+  })
+})
+
 describe('BaseDialog focus trap', () => {
   it('wraps Tab from the last control back to the first', () => {
     openDialog()
