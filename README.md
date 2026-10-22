@@ -4,7 +4,7 @@ A restaurant online-ordering app built with **Vue 3 + TypeScript**, as a code sa
 
 There is no backend: the API is simulated in the browser with [MSW](https://mswjs.io), including latency, failures and a database that survives reloads. A **Dev tools** panel lets you make the network slow, flaky or offline, so every loading, error and empty state can be seen on demand.
 
-**Live demo:** not deployed yet (see [Not done](#not-done--would-do-next)); it runs from the repo in under a minute, see below.
+**Live demo: https://tablefront-demo.netlify.app/** (staff area: `/admin/login`, credentials below). It also runs from the repo in under a minute, see below.
 
 |                                                          |                                                                      |
 | -------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -133,7 +133,6 @@ Each test starts with an empty browser, waits for things to appear instead of sl
 
 ## Not done / would do next
 
-- **A live demo URL.** The deploy config is there (`netlify.toml`, and the Docker image runs anywhere); it has not been deployed yet.
 - **Other browsers**: the end-to-end suite runs in Chromium only; Firefox and WebKit would be a one-line addition to the Playwright config once they are worth the CI minutes.
 - **A real backend and real authentication.** The token is a fixed string and `/api` is simulated. See DECISIONS.md for what would change.
 - **Payments, i18n, push notifications** are out of scope by design.
