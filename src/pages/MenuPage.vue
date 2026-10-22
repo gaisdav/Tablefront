@@ -131,7 +131,7 @@ const emptyTitle = computed(() => {
         @retry="menu.execute"
       >
         <template #loading>
-          <div class="grid">
+          <div class="grid grid--loading">
             <div v-for="n in 6" :key="n" class="card-skeleton">
               <BaseSkeleton variant="block" height="7rem" />
               <BaseSkeleton width="60%" />
@@ -191,6 +191,8 @@ const emptyTitle = computed(() => {
 .chips-skeleton {
   display: flex;
   gap: var(--space-2);
+  /* The same as the chips' own bottom padding, so the row does not change height when they arrive. */
+  padding-bottom: var(--space-1);
 }
 
 .results {
@@ -203,6 +205,13 @@ const emptyTitle = computed(() => {
   gap: var(--space-3);
   padding: 0;
   list-style: none;
+}
+
+/* Fills the window while loading, so the footer is already below the fold and does not jump out
+   of sight when the real (much longer) list arrives. */
+.grid--loading {
+  align-content: start;
+  min-height: 100dvh;
 }
 
 .card-skeleton {
