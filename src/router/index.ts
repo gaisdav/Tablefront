@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
+import { installRouteAccessibility } from '@/router/accessibility'
 import { routes } from '@/router/routes'
 import { scrollBehavior } from '@/router/scroll'
 
@@ -6,7 +7,7 @@ import { scrollBehavior } from '@/router/scroll'
 export function createAppRouter(
   history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),
 ) {
-  return createRouter({
+  const router = createRouter({
     history,
     routes,
     // Vue Router 5 deprecates this option in favour of an experimental plugin. The experimental
@@ -14,4 +15,6 @@ export function createAppRouter(
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     scrollBehavior,
   })
+  installRouteAccessibility(router)
+  return router
 }
