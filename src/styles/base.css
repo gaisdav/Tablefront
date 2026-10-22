@@ -10,6 +10,19 @@ body {
   font-size: var(--text-base);
 }
 
+/*
+ * Set by the Dev tools button, which floats over the bottom-left corner of the page: the space
+ * under the page that it needs, so it never covers the footer or the admin sidebar. Layouts that
+ * fill the window subtract it from their height.
+ */
+html.has-devtools {
+  --reserved-bottom: calc(var(--tap-size) + var(--space-4));
+}
+
+body {
+  padding-bottom: var(--reserved-bottom, 0px);
+}
+
 /* Set by modals (useScrollLock) while they are open. */
 body.scroll-locked {
   overflow: hidden;

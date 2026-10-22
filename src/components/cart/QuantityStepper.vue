@@ -94,7 +94,7 @@ function step(delta: number): void {
   display: inline-flex;
   align-items: center;
   /* An outline, not a border: it takes no room, so the buttons keep the full 44px tap target. */
-  outline: 1px solid var(--color-border-strong);
+  outline: 1px solid var(--color-control-border);
   outline-offset: -1px;
   border-radius: var(--radius-full);
   background: var(--color-surface);

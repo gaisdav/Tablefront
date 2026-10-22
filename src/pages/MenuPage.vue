@@ -132,8 +132,8 @@ const emptyTitle = computed(() => {
       >
         <template #loading>
           <div class="grid">
-            <div v-for="n in 6" :key="n" class="card-skeleton">
-              <BaseSkeleton variant="block" height="7rem" />
+            <div v-for="n in 12" :key="n" class="card-skeleton">
+              <BaseSkeleton variant="block" height="auto" class="card-skeleton__media" />
               <BaseSkeleton width="60%" />
               <BaseSkeleton />
             </div>
@@ -191,6 +191,8 @@ const emptyTitle = computed(() => {
 .chips-skeleton {
   display: flex;
   gap: var(--space-2);
+  /* The same as the chips' own bottom padding, so the row does not change height when they arrive. */
+  padding-bottom: var(--space-1);
 }
 
 .results {
@@ -203,6 +205,11 @@ const emptyTitle = computed(() => {
   gap: var(--space-3);
   padding: 0;
   list-style: none;
+}
+
+.card-skeleton__media {
+  /* The same proportions as a dish photo, so the placeholder is as tall as the card will be. */
+  aspect-ratio: 4 / 3;
 }
 
 .card-skeleton {

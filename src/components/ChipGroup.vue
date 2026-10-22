@@ -71,7 +71,7 @@ const name = useId()
   align-items: center;
   min-height: var(--tap-size);
   padding-inline: var(--space-4);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-full);
   background: var(--color-surface);
   font-weight: var(--weight-medium);

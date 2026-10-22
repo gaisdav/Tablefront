@@ -12,6 +12,8 @@
   --color-surface-sunken: #f3eee9;
   --color-border: #e6ded6;
   --color-border-strong: #cfc4b9;
+  /* The edge of a control (input, outlined button, switch track): 3:1 on every surface (WCAG 1.4.11). */
+  --color-control-border: #8a7d72;
   --color-text: #1f1a17;
   --color-text-muted: #6b6159;
 
@@ -87,6 +89,7 @@
     --color-surface-sunken: #120f0d;
     --color-border: #3a322c;
     --color-border-strong: #54493f;
+    --color-control-border: #7a6d62;
     --color-text: #f5efe9;
     --color-text-muted: #b3a79c;
 

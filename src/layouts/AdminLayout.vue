@@ -42,8 +42,8 @@ function signOut(): void {
 <style scoped>
 /* Phone: a header bar with scrollable tabs. Desktop: a fixed sidebar. */
 .admin {
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh - var(--reserved-bottom, 0px));
+  min-height: calc(100dvh - var(--reserved-bottom, 0px));
 }
 
 .sidebar {
@@ -125,8 +125,8 @@ function signOut(): void {
     flex-wrap: nowrap;
     align-items: stretch;
     gap: var(--space-4);
-    height: 100vh;
-    height: 100dvh;
+    height: calc(100vh - var(--reserved-bottom, 0px));
+    height: calc(100dvh - var(--reserved-bottom, 0px));
     padding: var(--space-4);
     border-right: 1px solid var(--color-border);
     border-bottom: 0;

@@ -113,8 +113,8 @@ async function submit(): Promise<void> {
 
 <style scoped>
 .page {
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh - var(--reserved-bottom, 0px));
+  min-height: calc(100dvh - var(--reserved-bottom, 0px));
   padding: var(--space-6) var(--gutter);
 }
 

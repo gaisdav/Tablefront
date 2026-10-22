@@ -44,8 +44,8 @@ const myOrders = useMyOrdersStore()
 .layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh - var(--reserved-bottom, 0px));
+  min-height: calc(100dvh - var(--reserved-bottom, 0px));
 }
 
 .header {
