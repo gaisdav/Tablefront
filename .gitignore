@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+*.local
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Private working notes (specs, plans), not part of the repo
+/local-docs/
