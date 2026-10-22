@@ -66,6 +66,27 @@ describe('My orders', () => {
     expect(cards(wrapper)[0]?.get('a').attributes('href')).toBe(`/orders/${running.id}`)
   })
 
+  it('keeps a delivery that is on its way among those in progress', async () => {
+    const dish = menuItems.find((candidate) => candidate.available)
+    if (dish === undefined) throw new Error('no dish')
+    const onTheWay = db.createOrder({
+      lines: [
+        { menuItemId: dish.id, name: dish.name, unitPriceCents: dish.priceCents, quantity: 1 },
+      ],
+      fulfillment: 'delivery',
+      customer: { name: 'Anna', phone: '+49 30 1234567', address: 'Hauptstr. 1, Berlin' },
+    })
+    db.setOrderStatus(onTheWay.id, 'out_for_delivery')
+    const done = place('completed')
+    remember(done.id, onTheWay.id)
+    const { wrapper } = await mountAppAt('/orders')
+    await untilLoaded(wrapper)
+
+    expect(sectionHeadings(wrapper)).toEqual(['In progress', 'Earlier'])
+    expect(titles(wrapper)).toEqual([`Order ${onTheWay.id}`, `Order ${done.id}`])
+    expect(cards(wrapper)[0]?.text()).toContain('On the way')
+  })
+
   it('describes an order: status, items, total and how it is collected', async () => {
     const order = place('ready', 2)
     remember(order.id)

@@ -4,7 +4,7 @@ import BaseButton from '@/components/BaseButton.vue'
 import OrderSummary from '@/components/checkout/OrderSummary.vue'
 import OrderStatusBadge from '@/components/order/OrderStatusBadge.vue'
 import { formatPlacedAt } from '@/domain/orderPresentation'
-import { allowedTransitions, transitionLabel } from '@/domain/orderStatus'
+import { allowedTransitions, statusLabel, transitionLabel } from '@/domain/orderStatus'
 import type { Order, OrderStatus } from '@/types/domain'
 
 const { order } = defineProps<{
@@ -69,12 +69,12 @@ watch(
 
     <section class="actions" aria-label="Change status">
       <div
-        v-if="allowedTransitions(order.status).length > 0"
+        v-if="allowedTransitions(order.status, order.fulfillment).length > 0"
         ref="actions"
         class="actions__buttons"
       >
         <BaseButton
-          v-for="status in allowedTransitions(order.status)"
+          v-for="status in allowedTransitions(order.status, order.fulfillment)"
           :key="status"
           :variant="status === 'cancelled' ? 'danger' : 'primary'"
           :loading="saving"
@@ -83,7 +83,9 @@ watch(
           {{ transitionLabel(status) }}
         </BaseButton>
       </div>
-      <p v-else class="text-muted">This order is {{ order.status }}; nothing more can be done.</p>
+      <p v-else class="text-muted">
+        This order is {{ statusLabel(order.status).toLowerCase() }}; nothing more can be done.
+      </p>
     </section>
   </div>
 </template>

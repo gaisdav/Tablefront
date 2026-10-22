@@ -83,7 +83,7 @@ describe('a persistent mock database', () => {
     const db = await persistentPageLoad()
 
     expect(db.listMenuItems({ includeUnavailable: true })).toHaveLength(menuItems.length)
-    expect(db.getOrder('ord-1008')).toBeUndefined()
+    expect(db.getOrder('ord-1009')).toBeUndefined()
   })
 
   it('keeps an order across a reload, and keeps numbering from where it was', async () => {
@@ -262,6 +262,7 @@ describe('a saved database that cannot be trusted', () => {
       (raw) =>
         (first(raw.orders).customer = { name: 'Anna', phone: '+49 30 1234567', address: 'x' }),
     ],
+    ['a pickup that is on the way', (raw) => (first(raw.orders).status = 'out_for_delivery')],
     ['a duplicate order id', (raw) => raw.orders.push({ ...first(raw.orders) })],
     [
       'a menu item with an unknown allergen',

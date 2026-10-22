@@ -139,7 +139,7 @@ describe('ordersApi.createOrder', () => {
   it('does not create an order when validation fails', async () => {
     await fieldErrorsFor(pickupOrder({ lines: [] }))
 
-    const error = await rejection(ordersApi.getOrder('ord-1008'))
+    const error = await rejection(ordersApi.getOrder('ord-1009'))
 
     expect(error).toMatchObject({ status: 404 })
   })

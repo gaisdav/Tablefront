@@ -71,6 +71,26 @@ describe('AdminOrderDetail: the buttons', () => {
     wrapper.unmount()
   })
 
+  it.each([
+    ['ready', ['Out for delivery']],
+    ['out_for_delivery', ['Mark as completed']],
+  ] as const)('offers a delivery in %s only %j', (status, expected) => {
+    const wrapper = mountDetail(status, false, {
+      fulfillment: 'delivery',
+      customer: { name: 'Anna', phone: '+49 30 1234567', address: 'Hauptstr. 1, Berlin' },
+    })
+
+    expect(buttons(wrapper)).toEqual(expected)
+    wrapper.unmount()
+  })
+
+  it('offers a ready pickup only to be completed, never to go out', () => {
+    const wrapper = mountDetail('ready')
+
+    expect(buttons(wrapper)).toEqual(['Mark as completed'])
+    wrapper.unmount()
+  })
+
   it.each(['completed', 'cancelled'] as const)(
     'renders no button at all for a %s order, and says why',
     (status) => {

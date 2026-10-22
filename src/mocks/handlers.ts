@@ -119,11 +119,11 @@ export const handlers = [
     const status = isRecord(body) ? body.status : undefined
     if (!isOrderStatus(status)) return validationFailed({ status: 'Unknown status' })
 
-    if (!canTransition(order.status, status)) {
+    if (!canTransition(order.status, status, order.fulfillment)) {
       return errorResponse(
         409,
         'invalid_transition',
-        `An order that is ${order.status} cannot become ${status}`,
+        `${order.fulfillment === 'delivery' ? 'A delivery' : 'A pickup'} that is ${order.status} cannot become ${status}`,
       )
     }
     return HttpResponse.json(db.setOrderStatus(order.id, status))

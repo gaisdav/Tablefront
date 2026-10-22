@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PROGRESS_STEPS, statusLabel } from '@/domain/orderStatus'
-import type { OrderStatus } from '@/types/domain'
+import { progressSteps, statusLabel } from '@/domain/orderStatus'
+import type { Fulfillment, OrderStatus } from '@/types/domain'
 
-const { status } = defineProps<{ status: OrderStatus }>()
+const { status, fulfillment } = defineProps<{ status: OrderStatus; fulfillment: Fulfillment }>()
 
-const currentIndex = computed(() => PROGRESS_STEPS.findIndex((step) => step === status))
+// A delivery has one more step than a pickup.
+const stepNames = computed(() => progressSteps(fulfillment))
+const currentIndex = computed(() => stepNames.value.findIndex((step) => step === status))
 
 type StepState = 'done' | 'current' | 'upcoming'
 
 const steps = computed(() =>
-  PROGRESS_STEPS.map((step, index) => {
+  stepNames.value.map((step, index) => {
     const state: StepState =
       index < currentIndex.value ? 'done' : index === currentIndex.value ? 'current' : 'upcoming'
     return { step, label: statusLabel(step), state }
@@ -25,7 +27,7 @@ const stateText: Record<StepState, string> = {
 </script>
 
 <template>
-  <ol class="stepper">
+  <ol class="stepper" :style="{ '--steps': steps.length }">
     <li
       v-for="item in steps"
       :key="item.step"
@@ -109,7 +111,7 @@ const stateText: Record<StepState, string> = {
 
 @media (min-width: 48rem) {
   .stepper {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--steps), minmax(0, 1fr));
   }
 
   .step {

@@ -47,6 +47,7 @@ describe('adminApi orders', () => {
       'ord-1006',
       'ord-1005',
       'ord-1004',
+      'ord-1008',
       'ord-1003',
       'ord-1002',
       'ord-1001',
@@ -86,6 +87,9 @@ describe('adminApi orders', () => {
     ['going backwards', 'ord-1005', 'new'],
     ['cancelling a ready order', 'ord-1003', 'cancelled'],
     ['reopening a completed order', 'ord-1001', 'preparing'],
+    ['sending a pickup out for delivery', 'ord-1003', 'out_for_delivery'],
+    ['cancelling a delivery that is on its way', 'ord-1008', 'cancelled'],
+    ['skipping the courier on a delivery', 'ord-1008', 'preparing'],
   ] as const)('rejects %s with 409 and leaves the order unchanged', async (_label, id, status) => {
     const before = (await adminApi.listOrders()).find((order) => order.id === id)
 
@@ -94,6 +98,25 @@ describe('adminApi orders', () => {
 
     expect(error).toMatchObject({ status: 409, code: 'invalid_transition' })
     expect(after?.status).toBe(before?.status)
+  })
+
+  it('takes a delivery out for delivery and then completes it; a pickup is just collected', async () => {
+    await adminApi.updateOrderStatus('ord-1004', 'ready')
+    const completeEarly = await rejection(adminApi.updateOrderStatus('ord-1004', 'completed'))
+    const out = await adminApi.updateOrderStatus('ord-1004', 'out_for_delivery')
+    const done = await adminApi.updateOrderStatus('ord-1004', 'completed')
+    const collected = await adminApi.updateOrderStatus('ord-1003', 'completed')
+
+    expect(completeEarly).toMatchObject({ status: 409, code: 'invalid_transition' })
+    expect(out.status).toBe('out_for_delivery')
+    expect(done.status).toBe('completed')
+    expect(collected.status).toBe('completed')
+  })
+
+  it('filters by the new status', async () => {
+    const onTheWay = await adminApi.listOrders({ status: 'out_for_delivery' })
+
+    expect(onTheWay.map((order) => order.id)).toEqual(['ord-1008'])
   })
 
   it('rejects with 404 for an unknown order', async () => {

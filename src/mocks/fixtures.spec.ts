@@ -44,6 +44,10 @@ describe('fixtures', () => {
         order.lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0),
       )
     }
-    expect(new Set(orders.map((order) => order.status)).size).toBe(5)
+    expect(new Set(orders.map((order) => order.status)).size).toBe(6)
+    // "On the way" belongs to a delivery.
+    for (const order of orders.filter((candidate) => candidate.status === 'out_for_delivery')) {
+      expect(order.fulfillment).toBe('delivery')
+    }
   })
 })

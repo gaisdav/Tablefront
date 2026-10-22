@@ -74,7 +74,7 @@ function where(order: Order): string {
         <p v-if="order.status === 'cancelled'" class="order__cancelled" role="alert">
           This order was cancelled. If that is unexpected, please contact the restaurant.
         </p>
-        <OrderStepper v-else :status="order.status" />
+        <OrderStepper v-else :status="order.status" :fulfillment="order.fulfillment" />
 
         <p v-if="refreshFailed && polling.isStopped.value" class="order__stale" role="status">
           This order can no longer be refreshed. Showing the last known status.

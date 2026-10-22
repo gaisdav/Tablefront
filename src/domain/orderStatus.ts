@@ -1,31 +1,60 @@
-import type { OrderStatus } from '@/types/domain'
+import type { Fulfillment, OrderStatus } from '@/types/domain'
 
 // Single source of truth for the order lifecycle: the UI uses it to decide which buttons to
 // render and the mock API uses it to reject invalid transitions with 409.
-const TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
-  new: ['preparing', 'cancelled'],
-  preparing: ['ready', 'cancelled'],
-  ready: ['completed'],
-  completed: [],
-  cancelled: [],
+//
+// The way out of "ready" depends on how the order is received: a pickup is collected, a delivery
+// goes out with a courier first ("out for delivery" exists only for deliveries). Nothing can be
+// cancelled once the food is ready: it is made, or on its way.
+const TRANSITIONS: Record<Fulfillment, Record<OrderStatus, readonly OrderStatus[]>> = {
+  pickup: {
+    new: ['preparing', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
+    ready: ['completed'],
+    out_for_delivery: [],
+    completed: [],
+    cancelled: [],
+  },
+  delivery: {
+    new: ['preparing', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
+    ready: ['out_for_delivery'],
+    out_for_delivery: ['completed'],
+    completed: [],
+    cancelled: [],
+  },
 }
 
-export function allowedTransitions(from: OrderStatus): readonly OrderStatus[] {
-  return TRANSITIONS[from]
+/** What an order in `from`, received as `fulfillment`, can move to next. */
+export function allowedTransitions(
+  from: OrderStatus,
+  fulfillment: Fulfillment,
+): readonly OrderStatus[] {
+  return TRANSITIONS[fulfillment][from]
 }
 
-export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return TRANSITIONS[from].includes(to)
+export function canTransition(
+  from: OrderStatus,
+  to: OrderStatus,
+  fulfillment: Fulfillment,
+): boolean {
+  return TRANSITIONS[fulfillment][from].includes(to)
+}
+
+/** Whether an order received this way can ever have this status (a pickup is never "on the way"). */
+export function isStatusFor(fulfillment: Fulfillment, status: OrderStatus): boolean {
+  return fulfillment === 'delivery' || status !== 'out_for_delivery'
 }
 
 export function isTerminalStatus(status: OrderStatus): boolean {
-  return TRANSITIONS[status].length === 0
+  return status === 'completed' || status === 'cancelled'
 }
 
 const LABELS: Record<OrderStatus, string> = {
   new: 'Received',
   preparing: 'Preparing',
   ready: 'Ready',
+  out_for_delivery: 'On the way',
   completed: 'Completed',
   cancelled: 'Cancelled',
 }
@@ -35,17 +64,17 @@ export function statusLabel(status: OrderStatus): string {
 }
 
 /** The happy path a guest follows; `cancelled` is a way out of it, not a step. */
-export const PROGRESS_STEPS = [
-  'new',
-  'preparing',
-  'ready',
-  'completed',
-] as const satisfies readonly OrderStatus[]
+export function progressSteps(fulfillment: Fulfillment): readonly OrderStatus[] {
+  return fulfillment === 'delivery'
+    ? ['new', 'preparing', 'ready', 'out_for_delivery', 'completed']
+    : ['new', 'preparing', 'ready', 'completed']
+}
 
 const ACTION_LABELS: Record<OrderStatus, string> = {
   new: 'Reopen',
   preparing: 'Start preparing',
   ready: 'Mark as ready',
+  out_for_delivery: 'Out for delivery',
   completed: 'Mark as completed',
   cancelled: 'Cancel order',
 }

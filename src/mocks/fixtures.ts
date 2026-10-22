@@ -225,7 +225,7 @@ export const menuItems: MenuItem[] = [
 
 /** The next ids the in-memory store hands out; they continue after the seed data. */
 export const NEXT_MENU_ITEM_NUMBER = menuItems.length + 1
-export const NEXT_ORDER_NUMBER = 1008
+export const NEXT_ORDER_NUMBER = 1009
 
 function line(menuItemId: string, quantity: number, note?: string): OrderLine {
   const item = menuItems.find((candidate) => candidate.id === menuItemId)
@@ -309,6 +309,21 @@ export function createSeedOrders(now: Date): Order[] {
         },
       },
       [line('item-6', 2), line('item-2', 1), line('item-19', 2)],
+    ),
+    order(
+      1008,
+      28,
+      now,
+      {
+        status: 'out_for_delivery',
+        fulfillment: 'delivery',
+        customer: {
+          name: 'Clara Neumann',
+          phone: '+49 175 8901234',
+          address: 'Bergmannstr. 21, 10961 Berlin',
+        },
+      },
+      [line('item-8', 1), line('item-13', 1)],
     ),
     order(
       1005,
