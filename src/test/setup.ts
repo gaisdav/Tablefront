@@ -10,6 +10,7 @@ beforeAll(() => {
 })
 
 beforeEach(() => {
+  localStorage.clear()
   resetDb()
   resetMockConditions()
   // Tests are deterministic: no simulated latency unless a test asks for it.
