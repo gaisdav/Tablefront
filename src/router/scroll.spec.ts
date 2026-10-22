@@ -16,6 +16,10 @@ describe('scrollBehavior', () => {
     expect(await scrollFor('/checkout')).toEqual({ top: 0 })
   })
 
+  it('stays put when only the query changes: a filter or a selected row keeps the user in place', async () => {
+    expect(await scrollFor('/?category=cat-mains')).toBe(false)
+  })
+
   it('restores the saved position on back and forward', async () => {
     expect(await scrollFor('/checkout', { left: 0, top: 480 })).toEqual({ left: 0, top: 480 })
   })

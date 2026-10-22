@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useToastsStore } from '@/stores/toasts'
 
 const toasts = useToastsStore()
+const infos = computed(() => toasts.toasts.filter((toast) => toast.kind === 'info'))
+const errors = computed(() => toasts.toasts.filter((toast) => toast.kind === 'error'))
 </script>
 
 <template>
@@ -9,11 +12,7 @@ const toasts = useToastsStore()
        alert (it interrupts), the rest wait their turn. -->
   <div class="host" role="region" aria-label="Notifications">
     <div class="host__live" aria-live="polite">
-      <div
-        v-for="toast in toasts.toasts.filter((t) => t.kind === 'info')"
-        :key="toast.id"
-        class="toast"
-      >
+      <div v-for="toast in infos" :key="toast.id" class="toast">
         <p class="toast__message">{{ toast.message }}</p>
         <button
           class="toast__close"
@@ -25,12 +24,7 @@ const toasts = useToastsStore()
         </button>
       </div>
     </div>
-    <div
-      v-for="toast in toasts.toasts.filter((t) => t.kind === 'error')"
-      :key="toast.id"
-      class="toast toast--error"
-      role="alert"
-    >
+    <div v-for="toast in errors" :key="toast.id" class="toast toast--error" role="alert">
       <p class="toast__message">{{ toast.message }}</p>
       <button
         class="toast__close"

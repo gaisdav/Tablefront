@@ -1,6 +1,16 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import AppBrand from '@/components/AppBrand.vue'
+import ToastHost from '@/components/ToastHost.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+
+function signOut(): void {
+  auth.logout()
+  void router.replace({ name: 'admin-login' })
+}
 </script>
 
 <template>
@@ -15,12 +25,17 @@ import AppBrand from '@/components/AppBrand.vue'
         <RouterLink :to="{ name: 'admin-orders' }" class="nav-link">Orders</RouterLink>
         <RouterLink :to="{ name: 'admin-menu' }" class="nav-link">Menu</RouterLink>
       </nav>
-      <RouterLink :to="{ name: 'menu' }" class="nav-link sidebar__back">Back to site</RouterLink>
+      <div class="sidebar__footer">
+        <RouterLink :to="{ name: 'menu' }" class="nav-link">Back to site</RouterLink>
+        <button class="nav-link nav-link--button" type="button" @click="signOut">Sign out</button>
+      </div>
     </aside>
 
     <main id="main" class="admin__main" tabindex="-1">
       <RouterView />
     </main>
+
+    <ToastHost />
   </div>
 </template>
 
@@ -49,7 +64,9 @@ import AppBrand from '@/components/AppBrand.vue'
   overflow-x: auto;
 }
 
-.sidebar__back {
+.sidebar__footer {
+  display: flex;
+  gap: var(--space-1);
   margin-left: auto;
 }
 
@@ -72,6 +89,14 @@ import AppBrand from '@/components/AppBrand.vue'
   font-weight: var(--weight-medium);
   text-decoration: none;
   white-space: nowrap;
+}
+
+.nav-link--button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
 }
 
 .nav-link:hover {
@@ -113,7 +138,8 @@ import AppBrand from '@/components/AppBrand.vue'
     width: auto;
   }
 
-  .sidebar__back {
+  .sidebar__footer {
+    flex-direction: column;
     margin: auto 0 0;
   }
 
