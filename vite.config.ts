@@ -29,6 +29,8 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      // The end-to-end tests belong to Playwright.
+      include: ['src/**/*.spec.ts'],
       setupFiles: ['./src/test/setup.ts'],
     },
   }
