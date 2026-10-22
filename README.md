@@ -109,17 +109,32 @@ Why these choices, and what would change with a real backend: [docs/DECISIONS.md
 | `pnpm typecheck`    | `vue-tsc --build` over the app and tooling configs |
 | `pnpm test`         | Vitest, single run                                 |
 | `pnpm test:watch`   | Vitest in watch mode                               |
+| `pnpm test:e2e`     | Playwright end-to-end tests (see below)            |
 
-CI runs formatting, lint, types, tests and the build on every pull request, and builds the Docker image and checks that it serves the app.
+CI runs formatting, lint, types, tests and the build on every pull request, builds the Docker image and checks that it serves the app, and runs the end-to-end tests in a separate job.
 
 ### Tests
 
 Several hundred tests (`pnpm test`; Vitest, jsdom, Vue Test Utils). Most are integration tests that mount the real app against the MSW server, so a test goes through router, stores, composables and the mock API like a user does. Timing-dependent code (polling, debounce) is tested with fake timers.
 
+### End-to-end tests
+
+Playwright runs real Chromium against the **production build of the demo** (the mock API on), the way it is deployed:
+
+```sh
+pnpm exec playwright install chromium   # once
+pnpm test:e2e                           # builds, serves on :4173, runs; about a minute
+pnpm test:e2e:ui                        # the interactive runner
+```
+
+They cover the journeys that matter: browsing and filtering the menu; the card stepper and the cart drawer; checkout with validation and a server failure; tracking an order while staff move it along in another tab; "My orders"; staff sign-in, a status change and its rollback when the server refuses, and creating, editing and deleting a dish; a lost connection; and placing an order with the keyboard alone. Failure paths are reached through the Dev tools panel, as a reviewer would.
+
+Each test starts with an empty browser, waits for things to appear instead of sleeping, and fails on any console error or uncaught exception. On a failure a trace and a screenshot are kept (`test-results/`, uploaded as an artifact in CI; replay with `pnpm exec playwright show-trace <trace.zip>`).
+
 ## Not done / would do next
 
 - **A live demo URL.** The deploy config is there (`netlify.toml`, and the Docker image runs anywhere); it has not been deployed yet.
-- **End-to-end tests in a real browser** (planned as the last pull request: Playwright against the demo build).
+- **Other browsers**: the end-to-end suite runs in Chromium only; Firefox and WebKit would be a one-line addition to the Playwright config once they are worth the CI minutes.
 - **A real backend and real authentication.** The token is a fixed string and `/api` is simulated. See DECISIONS.md for what would change.
 - **Payments, i18n, push notifications** are out of scope by design.
 - **A screen-reader pass** (VoiceOver, NVDA). Accessibility was checked structurally and by keyboard; see the notes.
