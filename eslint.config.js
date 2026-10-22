@@ -48,6 +48,10 @@ export default defineConfig([
           message:
             'Avoid `as` casts. At a validated boundary, disable this rule on the line with a reason.',
         },
+        {
+          selector: 'TSTypeAssertion',
+          message: 'Avoid `<T>value` assertions. Use a validated boundary with a reason instead.',
+        },
       ],
       'vue/block-lang': ['error', { script: { lang: 'ts' } }],
       'vue/component-api-style': ['error', ['script-setup']],
