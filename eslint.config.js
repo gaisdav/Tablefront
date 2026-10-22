@@ -53,6 +53,8 @@ export default defineConfig([
           message: 'Avoid `<T>value` assertions. Use a validated boundary with a reason instead.',
         },
       ],
+      // With type-based props an optional prop is simply `undefined` when absent.
+      'vue/require-default-prop': 'off',
       'vue/block-lang': ['error', { script: { lang: 'ts' } }],
       'vue/component-api-style': ['error', ['script-setup']],
       'vue/define-props-declaration': ['error', 'type-based'],
