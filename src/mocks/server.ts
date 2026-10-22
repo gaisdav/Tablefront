@@ -1,4 +1,4 @@
 import { setupServer } from 'msw/node'
+import { handlers } from '@/mocks/handlers'
 
-// Handlers for the full API contract are registered in the next PR; tests add their own with `server.use`.
-export const server = setupServer()
+export const server = setupServer(...handlers)
