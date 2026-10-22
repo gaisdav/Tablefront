@@ -47,6 +47,16 @@ describe('the auth store', () => {
     expect(sessionStorage.getItem(KEY)).toBeNull()
   })
 
+  it('writes the token to storage at once, not a tick later', async () => {
+    const auth = store()
+
+    await auth.login(MOCK_ADMIN)
+    expect(sessionStorage.getItem(KEY)).toBe(MOCK_ADMIN_TOKEN)
+
+    auth.logout()
+    expect(sessionStorage.getItem(KEY)).toBeNull()
+  })
+
   it('signs out and forgets the token', async () => {
     const auth = store()
     await auth.login(MOCK_ADMIN)

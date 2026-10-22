@@ -63,7 +63,7 @@ async function submit(): Promise<void> {
   submitting.value = true
   try {
     await auth.login({ email: form.email.trim(), password: form.password })
-    await router.replace(safeRedirect(route.query.redirect))
+    await router.replace(safeRedirect(router, route.query.redirect))
   } catch (caught) {
     problem.value = isApiError(caught) ? caught.message : 'Something went wrong. Please try again.'
     await focusFirstProblem()

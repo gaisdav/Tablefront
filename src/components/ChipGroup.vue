@@ -22,7 +22,8 @@ const name = useId()
        and select, and assistive technology says "1 of 5". Native inputs give all of that for free. -->
   <fieldset class="chips">
     <legend class="visually-hidden">{{ legend }}</legend>
-    <label v-for="option in options" :key="option.value ?? ''" class="chip">
+    <!-- Keyed by position: the options are a fixed list, and a value may be undefined ("All"). -->
+    <label v-for="(option, index) in options" :key="index" class="chip">
       <input
         v-model="selected"
         class="chip__input"

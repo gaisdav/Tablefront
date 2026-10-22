@@ -40,3 +40,20 @@ _Stacked on PR 06c (`pr-06c-persistent-mock-db`): the base of this PR is that br
 - Tests: auth store (sign in and out, reload, wrong credentials, blocked and full storage); the guard and the open-redirect rules, including a 401 mid-session and a slower request failing after the user was sent away; the login page; toasts with fake timers; `useAdminOrders` (loading, new orders, stop on 401, optimistic apply, confirmation, 409 rollback and re-read, network rollback, quiet 401, disallowed moves, no second change in flight, two orders at once, the stale-refresh race and a later refresh winning); the detail panel (buttons per status, none for finished orders, busy state, focus in three situations); the board page (list, counts, filter in the URL, narrow and wide details, links, optimistic change, rollback on 409 and on network failure, focus, selection and the very same rows surviving a refresh, a failing refresh, sign out).
 - Tests fail when their fix is removed: the guard, the open-redirect check, the 401 handler's logout, the rollback, the in-flight check, the transition check, the re-read after a conflict, rendering buttons for finished orders, using the dialog on a wide window, the scroll rule, and the stale-refresh rule.
 - In Chrome at 1280 px light and 375 px dark: redirected to the login page and back with the filter kept, a wrong password, sign-in, the optimistic change with focus on the next button and a toast, still signed in after a reload. The two console messages are the browser's own note about the deliberate 401 on a wrong password.
+
+## Review follow-up
+
+Fixed:
+
+- A saved change is no longer dropped inside the refresh itself (a refresh cancelled after its answer arrived could remove it and flip the order back); whether it still applies is decided from the accepted answer.
+- The return address after sign-in is resolved by the router (an address that is not a page of this app, lands on "not found", or is the login page falls back to the default) instead of being checked by string prefix; a 401 that arrives while a navigation is under way remembers where that navigation was going.
+- The token is written to `sessionStorage` synchronously, so storage never lags behind the store.
+- `scrollBehavior` keeps the position on a same-page navigation only when there was a page before; the first navigation starts at the top.
+- On a narrow window the details open as a modal only because the user tapped a row, not for a link with `?order=` and not on a resize; tapping the selected row then opens them instead of closing.
+- Chips are keyed by position (a value may be `undefined` or empty).
+- A test shows that focus returns to the pressed button when the change is undone.
+
+Not changed:
+
+- A change that was saved is kept on screen if polling has stopped: it is the newest thing known (the server accepted it), and nothing newer can arrive. A refresh from "Try again" or "Refresh" replaces it.
+- Focus when the actions disappear (an order becomes completed) already goes to the panel: the watcher runs before the DOM is patched, so the old actions are still there to ask; the "falls back to the panel" test covers it.

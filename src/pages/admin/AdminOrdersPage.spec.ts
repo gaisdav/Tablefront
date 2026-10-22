@@ -160,6 +160,33 @@ describe('the orders board: details', () => {
     expect(router.currentRoute.value.query.order).toBeUndefined()
   })
 
+  it('does not open a modal by itself for a link to an order on a narrow window, but a tap does', async () => {
+    const id = idWith('new')
+    const { wrapper } = await mountBoard(`/admin/orders?order=${id}`)
+
+    expect(dialog()).toBeNull()
+    expect(rowFor(wrapper, id).attributes('aria-pressed')).toBe('true')
+
+    await choose(wrapper, id)
+    await vi.waitFor(() => {
+      expect(dialog()).not.toBeNull()
+    })
+    expect(dialog()?.textContent).toContain(`Order ${id}`)
+  })
+
+  it('does not pop a modal open when the window narrows with an order selected', async () => {
+    setViewport(true)
+    const id = idWith('new')
+    const { wrapper } = await mountBoard(`/admin/orders?order=${id}`)
+    expect(wrapper.find('aside.detail h2').exists()).toBe(true)
+
+    setViewport(false)
+    const narrow = await mountBoard(`/admin/orders?order=${id}`)
+
+    expect(dialog()).toBeNull()
+    expect(narrow.wrapper.find('aside.detail').exists()).toBe(false)
+  })
+
   it('shows the details beside the list on a wide window, with no dialog', async () => {
     setViewport(true)
     const { wrapper } = await mountBoard()
@@ -273,6 +300,25 @@ describe('the orders board: changing a status', () => {
       expect(document.querySelector('.toast--error')).not.toBeNull()
     })
     expect(rowFor(wrapper, id).text()).toContain('Received')
+  })
+
+  it('puts focus back on the button that was pressed when the change is undone', async () => {
+    setViewport(true)
+    server.use(mswHttp.patch('/api/admin/orders/:id/status', () => HttpResponse.error()))
+    const { wrapper } = await mountBoard()
+    const id = idWith('new')
+    await choose(wrapper, id)
+    const first = wrapper.findAll<HTMLElement>('aside.detail .actions button')[0]
+    first?.element.focus()
+
+    await first?.trigger('click')
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('.toast--error')).not.toBeNull()
+    })
+    await vi.waitFor(() => {
+      expect(document.activeElement?.textContent.trim()).toBe('Start preparing')
+    })
   })
 
   it('keeps focus in the details after the pressed button is replaced', async () => {

@@ -1,4 +1,4 @@
-import { createMemoryHistory } from 'vue-router'
+import { createMemoryHistory, START_LOCATION } from 'vue-router'
 import { describe, expect, it } from 'vitest'
 import { createAppRouter } from '@/router'
 import { scrollBehavior } from '@/router/scroll'
@@ -18,6 +18,13 @@ describe('scrollBehavior', () => {
 
   it('stays put when only the query changes: a filter or a selected row keeps the user in place', async () => {
     expect(await scrollFor('/?category=cat-mains')).toBe(false)
+  })
+
+  it('starts at the top on the very first navigation, even to the same path', async () => {
+    const router = createAppRouter(createMemoryHistory())
+    await router.push('/')
+
+    expect(scrollBehavior(router.currentRoute.value, START_LOCATION, null)).toEqual({ top: 0 })
   })
 
   it('restores the saved position on back and forward', async () => {

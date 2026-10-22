@@ -18,10 +18,15 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
   }
 
-  // Side effect: the token survives a reload of the tab, and only of the tab.
-  watch(token, (value) => {
-    saveToken(value)
-  })
+  // Side effect: the token survives a reload of the tab, and only of the tab. `sync`, so storage
+  // never lags behind the store: a reload right after signing in or out sees the new state.
+  watch(
+    token,
+    (value) => {
+      saveToken(value)
+    },
+    { flush: 'sync' },
+  )
 
   return { token, isAuthenticated, login, logout }
 })

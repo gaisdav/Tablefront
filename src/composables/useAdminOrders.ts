@@ -22,6 +22,12 @@ interface Pending {
   settledAfterRefresh: number | null
 }
 
+/** A refresh's answer, with the number of the refresh that asked (see `Pending`). */
+interface Refresh {
+  number: number
+  orders: Order[]
+}
+
 /**
  * The orders board: all orders, kept fresh, with status changes applied at once and undone if the
  * server refuses.
@@ -38,15 +44,9 @@ export function useAdminOrders(intervalMs = ADMIN_POLL_INTERVAL_MS) {
   let refreshesStarted = 0
 
   const polling = usePolling(
-    async (signal) => {
+    async (signal): Promise<Refresh> => {
       const number = ++refreshesStarted
-      const orders = await adminApi.listOrders({}, signal)
-      for (const [id, change] of pending) {
-        if (change.settledAfterRefresh !== null && number > change.settledAfterRefresh) {
-          pending.delete(id)
-        }
-      }
-      return orders
+      return { number, orders: await adminApi.listOrders({}, signal) }
     },
     {
       intervalMs,
@@ -59,13 +59,25 @@ export function useAdminOrders(intervalMs = ADMIN_POLL_INTERVAL_MS) {
     },
   )
 
+  /**
+   * A change still applies unless the refresh on screen began after it was saved. Decided here,
+   * from the answer that was actually accepted, and not when a refresh finishes: an answer that
+   * is discarded (the refresh was cancelled) must not be able to remove a change.
+   */
+  function applies(change: Pending, shown: Refresh): boolean {
+    return change.settledAfterRefresh === null || shown.number <= change.settledAfterRefresh
+  }
+
   /** The orders as the user should see them: the server's, with changes in progress applied. */
-  const orders = computed<Order[] | undefined>(() =>
-    polling.data.value?.map((order) => {
+  const orders = computed<Order[] | undefined>(() => {
+    const shown = polling.data.value
+    return shown?.orders.map((order) => {
       const change = pending.get(order.id)
-      return change === undefined ? order : { ...order, status: change.status }
-    }),
-  )
+      return change === undefined || !applies(change, shown)
+        ? order
+        : { ...order, status: change.status }
+    })
+  })
 
   function isSaving(id: string): boolean {
     return pending.get(id)?.settledAfterRefresh === null

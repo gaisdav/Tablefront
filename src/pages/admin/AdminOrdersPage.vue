@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter, type LocationQuery } from 'vue-router'
 import AdminOrderDetail from '@/components/admin/AdminOrderDetail.vue'
 import AdminOrderRow from '@/components/admin/AdminOrderRow.vue'
@@ -50,6 +50,20 @@ function select(id: string | undefined): void {
   void router.replace({ query: withParam('order', id) })
 }
 
+// On a narrow window the details are a modal, and a modal must only open because the user asked:
+// not for a shared link with `?order=` in it, and not because the window was resized.
+const detailsRequested = ref(false)
+
+function toggle(id: string): void {
+  if (id === selectedId.value && (wide.value || detailsRequested.value)) {
+    detailsRequested.value = false
+    select(undefined)
+  } else {
+    detailsRequested.value = true
+    select(id)
+  }
+}
+
 const blockingError = computed(() =>
   board.orders.value === undefined ? polling.error.value : null,
 )
@@ -80,9 +94,12 @@ const visible = computed(() =>
 const selected = computed(() => board.orders.value?.find((order) => order.id === selectedId.value))
 
 const dialogOpen = computed({
-  get: () => !wide.value && selected.value !== undefined,
+  get: () => !wide.value && selected.value !== undefined && detailsRequested.value,
   set: (open) => {
-    if (!open) select(undefined)
+    if (!open) {
+      detailsRequested.value = false
+      select(undefined)
+    }
   },
 })
 </script>
@@ -121,7 +138,7 @@ const dialogOpen = computed({
                 <AdminOrderRow
                   :order="order"
                   :selected="order.id === selectedId"
-                  @select="select(order.id === selectedId ? undefined : order.id)"
+                  @select="toggle(order.id)"
                 />
               </li>
             </ul>
@@ -152,7 +169,7 @@ const dialogOpen = computed({
         </div>
 
         <BaseDialog
-          v-if="selected"
+          v-if="selected && !wide"
           v-model:open="dialogOpen"
           :title="`Order ${selected.id}`"
           placement="side"
