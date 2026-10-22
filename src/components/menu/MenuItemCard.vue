@@ -219,11 +219,6 @@ watch(
   min-height: var(--tap-size);
 }
 
-/* Add and the stepper are the same size, so one turning into the other does not shift anything. */
-.card__actions > * {
-  width: 8rem;
-}
-
 .card__status {
   color: var(--color-danger);
   font-size: var(--text-sm);

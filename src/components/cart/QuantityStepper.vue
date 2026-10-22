@@ -117,7 +117,6 @@ function step(delta: number): void {
 }
 
 .stepper__value {
-  flex: 1;
   min-width: 2rem;
   font-variant-numeric: tabular-nums;
   font-weight: var(--weight-semibold);
