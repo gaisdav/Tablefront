@@ -15,6 +15,18 @@ const {
   /** Stretches to the full width of its container. */
   block?: boolean
 }>()
+
+const emit = defineEmits<{ click: [event: MouseEvent] }>()
+
+// While loading the button stays enabled, so it keeps keyboard focus, and swallows the click
+// instead. preventDefault also stops a submit button from submitting the form a second time.
+function onClick(event: MouseEvent): void {
+  if (loading) {
+    event.preventDefault()
+    return
+  }
+  emit('click', event)
+}
 </script>
 
 <template>
@@ -22,8 +34,10 @@ const {
     class="button"
     :class="[`button--${variant}`, { 'button--block': block }]"
     :type="type"
-    :disabled="disabled || loading"
+    :disabled="disabled"
+    :aria-disabled="loading || undefined"
     :aria-busy="loading || undefined"
+    @click="onClick"
   >
     <span v-if="loading" class="button__spinner" aria-hidden="true" />
     <slot />
@@ -50,7 +64,7 @@ const {
     transform var(--duration-fast) var(--ease-out);
 }
 
-.button:active:not(:disabled) {
+.button:active:not(:disabled, [aria-busy='true']) {
   transform: translateY(1px);
 }
 
@@ -60,6 +74,7 @@ const {
 }
 
 .button[aria-busy='true'] {
+  opacity: 0.8;
   cursor: progress;
 }
 
@@ -74,7 +89,7 @@ const {
   box-shadow: var(--shadow-sm);
 }
 
-.button--primary:hover:not(:disabled) {
+.button--primary:hover:not(:disabled, [aria-busy='true']) {
   background: var(--color-accent-hover);
 }
 
@@ -84,7 +99,7 @@ const {
   color: var(--color-text);
 }
 
-.button--secondary:hover:not(:disabled) {
+.button--secondary:hover:not(:disabled, [aria-busy='true']) {
   background: var(--color-surface-sunken);
 }
 
@@ -93,17 +108,17 @@ const {
   color: var(--color-accent-text);
 }
 
-.button--ghost:hover:not(:disabled) {
+.button--ghost:hover:not(:disabled, [aria-busy='true']) {
   background: var(--color-accent-soft);
 }
 
 .button--danger {
   background: var(--color-danger);
-  color: var(--color-surface);
+  color: var(--color-on-danger);
 }
 
-.button--danger:hover:not(:disabled) {
-  filter: brightness(0.92);
+.button--danger:hover:not(:disabled, [aria-busy='true']) {
+  background: var(--color-danger-hover);
 }
 
 .button__spinner {
@@ -118,6 +133,19 @@ const {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Reduced motion: no rotation, but the spinner must still read as "working", so it pulses. */
+@media (prefers-reduced-motion: reduce) {
+  .button__spinner {
+    animation: pulse 1.4s ease-in-out infinite !important;
   }
 }
 </style>

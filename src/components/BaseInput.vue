@@ -1,9 +1,18 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, useAttrs, useId } from 'vue'
 
-// Attributes such as `name`, `autocomplete`, `required` or `placeholder` belong on the <input>,
-// not on the wrapper.
+// `class` and `style` style the wrapper, so layout rules (grid placement, margins) move the whole
+// field. Every other attribute (`name`, `autocomplete`, `required`, `placeholder`, ...) goes to
+// the <input>. `id`, `type`, `aria-invalid` and `aria-describedby` are owned by this component
+// and cannot be overridden: they keep the label and messages wired to the input.
 defineOptions({ inheritAttrs: false })
+const attrs = useAttrs()
+
+function inputAttrs(): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(attrs).filter(([name]) => name !== 'class' && name !== 'style'),
+  )
+}
 
 const model = defineModel<string>({ required: true })
 
@@ -15,7 +24,7 @@ const {
 } = defineProps<{
   /** Always visible: a placeholder is not a label. */
   label: string
-  type?: 'text' | 'email' | 'password' | 'tel' | 'search' | 'number' | 'url'
+  type?: 'text' | 'email' | 'password' | 'tel' | 'search' | 'url'
   hint?: string
   /** Shown under the field and announced with it; also marks the field invalid. */
   error?: string
@@ -32,11 +41,11 @@ const describedBy = computed(() => {
 </script>
 
 <template>
-  <div class="field">
+  <div class="field" :class="attrs.class" :style="attrs.style">
     <label class="field__label" :for="id">{{ label }}</label>
     <input
+      v-bind="inputAttrs()"
       :id="id"
-      v-bind="$attrs"
       v-model="model"
       class="field__input"
       :type="type"

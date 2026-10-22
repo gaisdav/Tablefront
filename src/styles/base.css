@@ -67,6 +67,11 @@ a:hover {
   white-space: nowrap;
 }
 
+/* <main> is focusable (tabindex="-1") only so the skip link can move focus into it. */
+main:focus-visible {
+  outline: none;
+}
+
 /* First tab stop on every page: jump past the header to the content. */
 .skip-link {
   position: absolute;
@@ -85,6 +90,7 @@ a:hover {
   transform: none;
 }
 
+/* Components that need motion to convey state (the loading spinner) opt out with a gentler animation. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

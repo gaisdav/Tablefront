@@ -22,8 +22,10 @@
   --color-accent-soft: #ffedd5;
   --color-on-accent: #ffffff;
 
-  /* Colour: status */
+  /* Colour: status. `danger` doubles as a text colour and a button fill (with `on-danger` on top). */
   --color-danger: #b91c1c;
+  --color-danger-hover: #991b1b;
+  --color-on-danger: #ffffff;
   --color-danger-soft: #fee2e2;
   --color-success: #15803d;
   --color-success-soft: #dcfce7;
@@ -88,12 +90,15 @@
     --color-text: #f5efe9;
     --color-text-muted: #b3a79c;
 
-    --color-accent: #c2410c;
+    --color-accent: #b53a0a;
+    --color-accent-hover: #c2410c;
     --color-accent-text: #fb923c;
     --color-accent-soft: #3b1d0d;
     --color-on-accent: #ffffff;
 
     --color-danger: #f87171;
+    --color-danger-hover: #fca5a5;
+    --color-on-danger: #1f0a0a;
     --color-danger-soft: #3b1414;
     --color-success: #4ade80;
     --color-success-soft: #0f2e1a;

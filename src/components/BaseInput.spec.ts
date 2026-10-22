@@ -42,6 +42,31 @@ describe('BaseInput', () => {
     expect(wrapper.attributes('autocomplete')).toBeUndefined()
   })
 
+  it('puts class and style on the wrapper, not on the input', () => {
+    const wrapper = mount(BaseInput, {
+      props: { label: 'Name', modelValue: '' },
+      attrs: { class: 'checkout__name', style: 'grid-column: 1 / -1' },
+    })
+
+    expect(wrapper.classes()).toContain('checkout__name')
+    expect(wrapper.attributes('style')).toContain('grid-column')
+    expect(wrapper.get('input').classes()).not.toContain('checkout__name')
+    expect(wrapper.get('input').attributes('style')).toBeUndefined()
+  })
+
+  it('keeps ownership of id and aria wiring even if the caller passes their own', () => {
+    const wrapper = mount(BaseInput, {
+      props: { label: 'Name', modelValue: '', error: 'Name is required' },
+      attrs: { id: 'custom', 'aria-describedby': 'elsewhere', 'aria-invalid': 'false' },
+    })
+
+    const input = wrapper.get('input')
+    expect(input.attributes('id')).not.toBe('custom')
+    expect(wrapper.get('label').attributes('for')).toBe(input.attributes('id'))
+    expect(input.attributes('aria-describedby')).toBe(wrapper.get('.field__error').attributes('id'))
+    expect(input.attributes('aria-invalid')).toBe('true')
+  })
+
   it('marks the field invalid and links the error message to it', () => {
     const wrapper = mountInput({ error: 'Name is required' })
 
