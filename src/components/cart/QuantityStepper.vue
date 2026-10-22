@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { MAX_QUANTITY } from '@/domain/cart'
 
 const quantity = defineModel<number>({ required: true })
@@ -6,16 +7,28 @@ const {
   label,
   min = 1,
   max = MAX_QUANTITY,
+  removable,
+  silent,
 } = defineProps<{
   /** What is being counted, for assistive technology: "Quantity of Margherita pizza". */
   label: string
   min?: number
   max?: number
+  /** At the minimum the minus button removes the item instead (the value becomes 0). */
+  removable?: boolean
+  /** Do not speak each new value, for where something else already announces the change. */
+  silent?: boolean
 }>()
+
+const removes = computed(() => removable && quantity.value <= min)
 
 // A button at its limit is `aria-disabled` rather than `disabled`: a really disabled button
 // drops keyboard focus to the page just as the user reaches the limit.
 function step(delta: number): void {
+  if (delta < 0 && removes.value) {
+    quantity.value = 0
+    return
+  }
   const next = quantity.value + delta
   if (next >= min && next <= max) quantity.value = next
 }
@@ -26,13 +39,29 @@ function step(delta: number): void {
     <button
       class="stepper__button"
       type="button"
-      aria-label="Decrease quantity"
-      :aria-disabled="quantity <= min || undefined"
+      :class="{ 'stepper__button--remove': removes }"
+      :aria-label="removes ? `Remove ${label} from cart` : 'Decrease quantity'"
+      :aria-disabled="(quantity <= min && !removable) || undefined"
       @click="step(-1)"
     >
-      −
+      <svg
+        v-if="removes"
+        class="stepper__icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12.5h9.4L17.5 7M10 11v5M14 11v5" />
+      </svg>
+      <template v-else>−</template>
     </button>
-    <output class="stepper__value" aria-live="polite">{{ quantity }}</output>
+    <output class="stepper__value" :aria-live="silent ? undefined : 'polite'">
+      {{ quantity }}
+    </output>
     <button
       class="stepper__button"
       type="button"
@@ -75,6 +104,15 @@ function step(delta: number): void {
   color: var(--color-text-muted);
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.stepper__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.stepper__button--remove {
+  color: var(--color-danger);
 }
 
 .stepper__value {

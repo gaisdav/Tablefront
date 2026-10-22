@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import MenuItemCard from '@/components/menu/MenuItemCard.vue'
 import type { MenuItem } from '@/types/domain'
@@ -74,14 +74,100 @@ describe('MenuItemCard', () => {
     expect(wrapper.emitted('add')).toEqual([[item]])
   })
 
-  it('says how many are already in the cart, only when some are', () => {
-    expect(mountCard().text()).not.toContain('in cart')
-    expect(mount(MenuItemCard, { props: { item, quantityInCart: 0 } }).text()).not.toContain(
-      'in cart',
-    )
-    expect(mount(MenuItemCard, { props: { item, quantityInCart: 3 } }).text()).toContain(
-      '3 in cart',
-    )
+  it('shows Add while none are in the cart, and the stepper once some are', () => {
+    const none = mountCard()
+    const some = mount(MenuItemCard, { props: { item, quantityInCart: 3 } })
+
+    expect(none.find('[role="group"]').exists()).toBe(false)
+    expect(none.find('[aria-label="Add Margherita pizza to cart"]').exists()).toBe(true)
+    expect(some.find('[aria-label^="Add "]').exists()).toBe(false)
+    expect(some.get('output').text()).toBe('3')
+  })
+
+  it('changes the quantity with + and −, and removes at one', async () => {
+    const wrapper = mount(MenuItemCard, { props: { item, quantityInCart: 2 } })
+
+    await wrapper.get('[aria-label="Increase quantity"]').trigger('click')
+    await wrapper.get('[aria-label="Decrease quantity"]').trigger('click')
+    await wrapper.setProps({ quantityInCart: 1 })
+    await wrapper.get('[aria-label="Remove Margherita pizza from cart"]').trigger('click')
+
+    expect(wrapper.emitted('change-quantity')).toEqual([
+      [item, 3],
+      [item, 1],
+      [item, 0],
+    ])
+  })
+
+  it('does not speak by itself: the cart announcement already says what changed', () => {
+    const wrapper = mount(MenuItemCard, { props: { item, quantityInCart: 2 } })
+
+    expect(wrapper.get('output').attributes('aria-live')).toBeUndefined()
+  })
+
+  describe('focus', () => {
+    const stepperButton = (wrapper: ReturnType<typeof mountCard>) =>
+      wrapper.get<HTMLElement>('[aria-label="Increase quantity"]').element
+    const addButton = (wrapper: ReturnType<typeof mountCard>) =>
+      wrapper.get<HTMLElement>('[data-add]').element
+
+    function mountAttached(quantityInCart: number) {
+      return mount(MenuItemCard, { props: { item, quantityInCart }, attachTo: document.body })
+    }
+
+    it('moves to + after Add turns into the stepper', async () => {
+      const wrapper = mountAttached(0)
+
+      // The store changes in the same tick as the click, as it does in the app.
+      void wrapper.get('[data-add]').trigger('click')
+      await wrapper.setProps({ quantityInCart: 1 })
+      await flushPromises()
+
+      expect(document.activeElement).toBe(stepperButton(wrapper))
+      wrapper.unmount()
+    })
+
+    it('moves back to Add after the last one is removed', async () => {
+      const wrapper = mountAttached(1)
+
+      void wrapper.get('[aria-label="Remove Margherita pizza from cart"]').trigger('click')
+      await wrapper.setProps({ quantityInCart: 0 })
+      await flushPromises()
+
+      expect(document.activeElement).toBe(addButton(wrapper))
+      wrapper.unmount()
+    })
+
+    it('forgets an Add that changed nothing instead of stealing focus later', async () => {
+      const wrapper = mountAttached(0)
+      await wrapper.get('[data-add]').trigger('click') // the parent ignored it
+      const other = document.createElement('input')
+      document.body.append(other)
+      other.focus()
+
+      await wrapper.setProps({ quantityInCart: 0 })
+      await wrapper.setProps({ quantityInCart: 2 }) // later, from the drawer
+      await flushPromises()
+
+      expect(document.activeElement).toBe(other)
+      other.remove()
+      wrapper.unmount()
+    })
+
+    it('does not take focus when the cart changed somewhere else', async () => {
+      const wrapper = mountAttached(0)
+      const other = document.createElement('input')
+      document.body.append(other)
+      other.focus()
+
+      await wrapper.setProps({ quantityInCart: 2 })
+      await wrapper.setProps({ quantityInCart: 0 })
+      await flushPromises()
+
+      expect(document.activeElement).toBe(other)
+      other.remove()
+      wrapper.unmount()
+    })
   })
 
   it('cannot be added when sold out', () => {

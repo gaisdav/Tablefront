@@ -1,15 +1,61 @@
 <script setup lang="ts">
+import { nextTick, useTemplateRef, watch } from 'vue'
 import BaseButton from '@/components/BaseButton.vue'
+import QuantityStepper from '@/components/cart/QuantityStepper.vue'
 import { formatCents } from '@/domain/money'
 import type { MenuItem } from '@/types/domain'
 
-defineProps<{
+const { item, quantityInCart = 0 } = defineProps<{
   item: MenuItem
   /** How many of this dish are in the cart already. */
   quantityInCart?: number
 }>()
 
-defineEmits<{ add: [item: MenuItem] }>()
+const emit = defineEmits<{
+  add: [item: MenuItem]
+  /** The new quantity from the stepper; 0 means "remove it". */
+  'change-quantity': [item: MenuItem, quantity: number]
+}>()
+
+// "Add" turns into the stepper and back, so the button the user just pressed disappears. Focus
+// goes to where the same finger or key would carry on: the + after adding, "Add" after removing.
+// Only changes made on this card move focus; the cart changing elsewhere must not steal it.
+const actions = useTemplateRef<HTMLElement>('actions')
+let focusNext: 'stepper' | 'add' | null = null
+
+// The wish only lasts until the update it caused has been rendered. If the click changed nothing
+// (the parent ignored it), it must not linger and pull focus when the cart changes later.
+// Called after the emit: by then the parent's change has scheduled a render, and `nextTick` waits
+// for that render; asked any earlier, it would resolve before it and the wish would be gone.
+function expireFocusWish(): void {
+  void nextTick(() => {
+    focusNext = null
+  })
+}
+
+function add(): void {
+  focusNext = 'stepper'
+  emit('add', item)
+  expireFocusWish()
+}
+
+function change(quantity: number): void {
+  if (quantity === 0) focusNext = 'add'
+  emit('change-quantity', item, quantity)
+  expireFocusWish()
+}
+
+watch(
+  () => quantityInCart > 0,
+  async () => {
+    const target = focusNext
+    focusNext = null
+    await nextTick()
+    if (target === 'stepper')
+      actions.value?.querySelector<HTMLElement>('[aria-label="Increase quantity"]')?.focus()
+    else if (target === 'add') actions.value?.querySelector<HTMLElement>('[data-add]')?.focus()
+  },
+)
 </script>
 
 <template>
@@ -44,15 +90,25 @@ defineEmits<{ add: [item: MenuItem] }>()
         <li v-for="allergen in item.allergens" :key="allergen" class="badge">{{ allergen }}</li>
       </ul>
       <p v-if="!item.available" class="card__status">Sold out</p>
-      <div v-else class="card__actions">
+      <div v-else ref="actions" class="card__actions">
+        <!-- Same height either way, so the card does not jump when one turns into the other. -->
+        <QuantityStepper
+          v-if="quantityInCart > 0"
+          :model-value="quantityInCart"
+          :label="item.name"
+          removable
+          silent
+          @update:model-value="change"
+        />
         <BaseButton
+          v-else
+          data-add
           variant="secondary"
           :aria-label="`Add ${item.name} to cart`"
-          @click="$emit('add', item)"
+          @click="add"
         >
           Add
         </BaseButton>
-        <p v-if="quantityInCart" class="card__in-cart">{{ quantityInCart }} in cart</p>
       </div>
     </div>
   </article>
@@ -129,6 +185,8 @@ defineEmits<{ add: [item: MenuItem] }>()
 }
 
 .card__description {
+  /* Takes the spare height, so allergens and the action line up along the bottom of every card. */
+  flex-grow: 1;
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-muted);
@@ -142,7 +200,6 @@ defineEmits<{ add: [item: MenuItem] }>()
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-  margin-top: auto;
   padding: 0;
   list-style: none;
 }
@@ -159,13 +216,7 @@ defineEmits<{ add: [item: MenuItem] }>()
 .card__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-}
-
-.card__in-cart {
-  color: var(--color-accent-text);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  min-height: var(--tap-size);
 }
 
 .card__status {
@@ -177,7 +228,7 @@ defineEmits<{ add: [item: MenuItem] }>()
 @media (min-width: 48rem) {
   .card {
     grid-template-columns: 1fr;
-    align-content: start;
+    grid-template-rows: auto 1fr;
     padding: 0 0 var(--space-4);
     overflow: hidden;
   }
