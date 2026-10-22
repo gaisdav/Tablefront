@@ -24,7 +24,4 @@
     Cache-Control = "no-cache"
     Service-Worker-Allowed = "/"
 
-[[headers]]
-  for = "/index.html"
-  [headers.values]
-    Cache-Control = "no-cache"
+# (HTML is served with `max-age=0, must-revalidate` by default, so a new deploy is picked up.)

@@ -13,7 +13,7 @@ There is no backend: the API is simulated in the browser with [MSW](https://mswj
 
 ## Run it
 
-**With pnpm** (Node 22, see `.nvmrc`; [pnpm](https://pnpm.io) 12):
+**With pnpm** (Node 22, see `.nvmrc`; [pnpm](https://pnpm.io), the version is pinned in `package.json`):
 
 ```sh
 pnpm install
@@ -114,7 +114,7 @@ CI runs formatting, lint, types, tests and the build on every pull request, and 
 
 ### Tests
 
-About 880 tests (Vitest, jsdom, Vue Test Utils). Most are integration tests that mount the real app against the MSW server, so a test goes through router, stores, composables and the mock API like a user does. Timing-dependent code (polling, debounce) is tested with fake timers.
+Several hundred tests (`pnpm test`; Vitest, jsdom, Vue Test Utils). Most are integration tests that mount the real app against the MSW server, so a test goes through router, stores, composables and the mock API like a user does. Timing-dependent code (polling, debounce) is tested with fake timers.
 
 ## Not done / would do next
 

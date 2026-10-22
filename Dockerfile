@@ -8,7 +8,8 @@ WORKDIR /app
 RUN corepack enable
 
 # Dependencies first, so this layer is reused until the lockfile changes.
-COPY package.json pnpm-lock.yaml ./
+# (Any pnpm settings files are copied too, so the install uses the same config as local and CI.)
+COPY package.json pnpm-lock.yaml .npmrc* pnpm-workspace.yaml* ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -18,9 +19,11 @@ ENV VITE_ENABLE_MOCKS=true
 RUN pnpm build
 
 # ---- Serve: static files behind nginx ----
-FROM nginx:1.29-alpine AS serve
+# The unprivileged image runs as a non-root user and listens on 8080, so it also starts on
+# platforms that forbid root or ports below 1024. The tag is pinned for reproducible builds.
+FROM nginxinc/nginx-unprivileged:1.29.8-alpine AS serve
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-  CMD wget -qO /dev/null http://127.0.0.1/ || exit 1
+  CMD wget -qO /dev/null http://127.0.0.1:8080/ || exit 1

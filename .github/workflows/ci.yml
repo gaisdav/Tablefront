@@ -40,10 +40,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: Build the image
         run: docker build -t tablefront .
-      - name: Serve it and check the single-page-app fallback
+      - name: Serve it and check what it serves
         run: |
-          docker run -d --name tablefront -p 8080:80 tablefront
-          for i in $(seq 1 20); do curl -fs http://localhost:8080/ >/dev/null && break; sleep 1; done
-          curl -fs http://localhost:8080/ | grep -q '<div id="app">'
-          curl -fs http://localhost:8080/orders | grep -q '<div id="app">'
-          curl -fs http://localhost:8080/mockServiceWorker.js | grep -q 'Mock Service Worker'
+          docker run -d --name tablefront -p 8080:8080 tablefront
+          scripts/check-image.sh http://localhost:8080
+      - name: Container log
+        if: failure()
+        run: docker logs tablefront
