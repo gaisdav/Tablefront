@@ -1,8 +1,18 @@
+html {
+  /* Keeps the page from shifting sideways when a modal hides the scrollbar. */
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-base);
+}
+
+/* Set by modals (useScrollLock) while they are open. */
+body.scroll-locked {
+  overflow: hidden;
 }
 
 h1 {
