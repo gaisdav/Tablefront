@@ -52,10 +52,9 @@ function sync(): void {
 
 /**
  * Keeps the database across page reloads: starts from what was saved (if it is readable) and saves
- * after every change from now on. Used by the browser build only. Calling it again does nothing.
+ * after every change from now on. Used by the browser build only. Calling it again is harmless.
  */
 export function enableDbPersistence(): void {
-  if (persistent) return
   persistent = true
   sync()
 }
