@@ -33,3 +33,17 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the image
+        run: docker build -t tablefront .
+      - name: Serve it and check the single-page-app fallback
+        run: |
+          docker run -d --name tablefront -p 8080:80 tablefront
+          for i in $(seq 1 20); do curl -fs http://localhost:8080/ >/dev/null && break; sleep 1; done
+          curl -fs http://localhost:8080/ | grep -q '<div id="app">'
+          curl -fs http://localhost:8080/orders | grep -q '<div id="app">'
+          curl -fs http://localhost:8080/mockServiceWorker.js | grep -q 'Mock Service Worker'
