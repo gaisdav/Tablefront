@@ -26,7 +26,7 @@ export const useCartStore = defineStore('cart', () => {
 
   /** Adds `quantity` of a dish. Adding it again increases the quantity; the price is the latest one. */
   function add(item: MenuItem, quantity = 1): void {
-    if (!item.available) return
+    if (!item.available || Number.isNaN(quantity)) return
     const existing = lines.value.find((line) => line.menuItemId === item.id)
     if (existing === undefined) {
       const amount = clampQuantity(quantity)
@@ -41,6 +41,16 @@ export const useCartStore = defineStore('cart', () => {
       }
       return
     }
+    if (existing.unitPriceCents !== item.priceCents) {
+      // The earlier units are repriced too, so say so instead of changing the total silently.
+      notices.value.push({
+        id: nextNoticeId++,
+        kind: 'price-changed',
+        name: item.name,
+        fromCents: existing.unitPriceCents,
+        toCents: item.priceCents,
+      })
+    }
     existing.quantity = clampQuantity(existing.quantity + quantity)
     existing.name = item.name
     existing.unitPriceCents = item.priceCents
@@ -49,7 +59,8 @@ export const useCartStore = defineStore('cart', () => {
   /** Sets the quantity; zero or less removes the line. */
   function setQuantity(menuItemId: string, quantity: number): void {
     const line = lines.value.find((candidate) => candidate.menuItemId === menuItemId)
-    if (line === undefined) return
+    // NaN would survive Math.max/min and poison every total, so it is not a quantity at all.
+    if (line === undefined || Number.isNaN(quantity)) return
     const amount = clampQuantity(quantity)
     if (amount === 0) remove(menuItemId)
     else line.quantity = amount
@@ -74,6 +85,9 @@ export const useCartStore = defineStore('cart', () => {
    * recorded as a notice so the user is told rather than finding out at checkout.
    */
   function reconcile(menu: readonly MenuItem[]): void {
+    // An empty menu is far more likely a backend hiccup than "everything sold out"; removing the
+    // whole cart on that evidence would lose the guest's order.
+    if (menu.length === 0) return
     const current = new Map(menu.map((item) => [item.id, item]))
     const reconciled: CartLine[] = []
     let changed = false

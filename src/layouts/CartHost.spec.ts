@@ -81,6 +81,40 @@ describe('cart from the menu', () => {
     expect(announcement(wrapper)).toBe('Margherita pizza: 2 in cart. Cart total €22.00.')
   })
 
+  it('re-announces an identical message by clearing the live region first', async () => {
+    const { wrapper, cart } = await mountAppAt('/')
+    await untilMenuLoaded(wrapper)
+    const addButton = '[aria-label="Add Margherita pizza to cart"]'
+    await wrapper.get(addButton).trigger('click')
+    // The drawer is silent while open, so the region still holds "Added ..." after this.
+    await openCart(wrapper)
+    inDialog('Remove Margherita pizza from cart')?.click()
+    await vi.waitFor(() => {
+      expect(cart.isEmpty).toBe(true)
+    })
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await vi.waitFor(() => {
+      expect(dialog()).toBeNull()
+    })
+    const seen: string[] = []
+    const observer = new MutationObserver(() => {
+      seen.push(announcement(wrapper))
+    })
+    observer.observe(wrapper.get('p.visually-hidden[role="status"]').element, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    })
+
+    await wrapper.get(addButton).trigger('click')
+    await vi.waitFor(() => {
+      expect(announcement(wrapper)).toBe('Added Margherita pizza. Cart total €11.00.')
+    })
+    observer.disconnect()
+
+    expect(seen).toContain('')
+  })
+
   it('offers no add button for a sold-out dish', async () => {
     const { wrapper } = await mountAppAt('/')
     await untilMenuLoaded(wrapper)

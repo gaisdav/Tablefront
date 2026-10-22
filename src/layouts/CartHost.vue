@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { menuApi } from '@/api/menuApi'
 import CartButton from '@/components/cart/CartButton.vue'
@@ -14,6 +14,19 @@ const cart = useCartStore()
 const router = useRouter()
 const open = ref(false)
 const announcement = ref('')
+
+// A live region only speaks when its text changes, so the same message twice in a row (add, remove,
+// add again) is cleared first to make the second one a change.
+function announce(message: string): void {
+  if (announcement.value !== message) {
+    announcement.value = message
+    return
+  }
+  announcement.value = ''
+  void nextTick(() => {
+    announcement.value = message
+  })
+}
 
 // Compares the cart with what is on the menu now (a dish may have sold out, a price may have
 // changed since it was saved). Results land in `cart.notices`.
@@ -41,12 +54,14 @@ watch(
   () => [cart.lines.map((line) => ({ ...line })), cart.notices.length] as const,
   ([after, noticeCount], [before, previousNoticeCount]) => {
     if (noticeCount > previousNoticeCount) {
-      announcement.value = `Your cart changed. ${cart.notices.slice(previousNoticeCount).map(describeNotice).join(' ')}`
+      announce(
+        `Your cart changed. ${cart.notices.slice(previousNoticeCount).map(describeNotice).join(' ')}`,
+      )
       return
     }
     if (open.value) return
     const message = describeCartChange(before, after)
-    if (message !== null) announcement.value = message
+    if (message !== null) announce(message)
   },
   { deep: true },
 )

@@ -70,3 +70,21 @@ localStorage.setItem(
 3. Why `CartHost` is the only smart component, and how announcements are decided in one watcher.
 4. Focus behaviour of the drawer: initial focus, trap, Escape, restore, and the stepper that stays focusable at its limit.
 5. What the cart deliberately does not do yet (multi-tab sync, same dish with different notes as separate lines).
+
+## Review follow-up
+
+Fixed:
+
+- Reconciling with an empty menu response is skipped, so a backend hiccup cannot wipe the cart.
+- Adding a dish again at a different price now raises a `price-changed` notice instead of repricing the earlier units silently.
+- `NaN` quantities are ignored by `add` and `setQuantity`.
+- The live region is cleared before an identical message is repeated, so it is spoken again.
+
+Not changed, on purpose:
+
+- Multi-tab sync: a stated non-goal of this PR.
+- Invalid saved lines and schema bumps are dropped: guessing a fix for data we cannot trust is worse than starting clean, and the server limits are the source of truth.
+- The `-` button at 1 stays inert (`aria-disabled`); the separate Remove button is the explicit way to delete a line.
+- Backdrop click pairs mousedown and mouseup on the backdrop itself; that is the intended guard against drags that end there.
+- The unavailable-item `add` guard is a store invariant; the UI never offers the button for such dishes.
+- The menu endpoint is not paginated.

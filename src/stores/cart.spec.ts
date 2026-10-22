@@ -107,6 +107,28 @@ describe('cart: adding', () => {
       quantity: 2,
     })
   })
+
+  it('tells the user when adding again reprices the dish', () => {
+    const cart = freshStore()
+    cart.add(margherita)
+
+    cart.add({ ...margherita, priceCents: 1200 })
+    cart.add({ ...margherita, priceCents: 1200 })
+
+    expect(cart.notices).toMatchObject([
+      { kind: 'price-changed', name: 'Margherita pizza', fromCents: 1100, toCents: 1200 },
+    ])
+  })
+
+  it('ignores NaN quantities instead of poisoning the totals', () => {
+    const cart = freshStore()
+    cart.add(margherita)
+
+    cart.setQuantity('item-5', Number.NaN)
+    cart.add(margherita, Number.NaN)
+
+    expect(cart.subtotalCents).toBe(1100)
+  })
 })
 
 describe('cart: changing quantity, notes and lines', () => {
@@ -299,6 +321,16 @@ describe('cart: reconciling with the current menu', () => {
     expect(cart.notices).toEqual([])
   })
 
+  it('keeps the cart when the menu comes back empty', () => {
+    const cart = freshStore()
+    cart.add(margherita)
+
+    cart.reconcile([])
+
+    expect(cart.lines).toHaveLength(1)
+    expect(cart.notices).toEqual([])
+  })
+
   it('does not repeat a notice when reconciled again', () => {
     const cart = freshStore()
     cart.add(margherita)
@@ -314,7 +346,7 @@ describe('cart: reconciling with the current menu', () => {
     const cart = freshStore()
     cart.add(margherita)
     cart.add(lemonade)
-    cart.reconcile([])
+    cart.reconcile([dish('item-99', 'Other', 100)])
     const [first, second] = cart.notices
     expect(first?.id).not.toBe(second?.id)
 
