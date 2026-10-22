@@ -73,7 +73,7 @@ describe('cart from the menu', () => {
     expect(cart.quantityOf('item-5')).toBe(1)
     expect(cartButton(wrapper).attributes('aria-label')).toBe('Cart, 1 item')
     expect(wrapper.find('[aria-label="Add Margherita pizza to cart"]').exists()).toBe(false)
-    expect(wrapper.get('.card [role="group"] output').text()).toBe('1')
+    expect(wrapper.get('.card [role="group"] .stepper__value').text()).toBe('1')
     expect(announcement(wrapper)).toBe('Added Margherita pizza. Cart total €11.00.')
 
     await wrapper.get('[aria-label="Increase quantity"]').trigger('click')
@@ -120,6 +120,8 @@ describe('cart from the menu', () => {
     const { wrapper, cart } = await mountAppAt('/')
     await untilMenuLoaded(wrapper)
     const card = () => wrapper.findAll('.card').find((c) => c.text().includes('Margherita pizza'))
+    // A real click focuses the button; jsdom's synthetic one does not.
+    wrapper.get<HTMLElement>('[aria-label="Add Margherita pizza to cart"]').element.focus()
     await wrapper.get('[aria-label="Add Margherita pizza to cart"]').trigger('click')
     await flushPromises()
     // The button that was pressed is gone; focus carries on at the +.
@@ -129,6 +131,7 @@ describe('cart from the menu', () => {
     expect(cart.quantityOf('item-5')).toBe(2)
     await card()?.get('[aria-label="Decrease quantity"]').trigger('click')
     expect(cart.quantityOf('item-5')).toBe(1)
+    card()?.get<HTMLElement>('[aria-label="Remove Margherita pizza from cart"]').element.focus()
     await card()?.get('[aria-label="Remove Margherita pizza from cart"]').trigger('click')
 
     await flushPromises()

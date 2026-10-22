@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { MAX_QUANTITY } from '@/domain/cart'
 
 const quantity = defineModel<number>({ required: true })
@@ -20,7 +20,16 @@ const {
   silent?: boolean
 }>()
 
-const removes = computed(() => removable && quantity.value <= min)
+// "Remove" is about the last unit, whatever `min` is.
+const removes = computed(() => removable && quantity.value === 1)
+const increase = useTemplateRef<HTMLButtonElement>('increase')
+
+defineExpose({
+  /** For a parent that has just swapped another control for this one and wants focus to follow. */
+  focusIncrease: () => {
+    increase.value?.focus()
+  },
+})
 
 // A button at its limit is `aria-disabled` rather than `disabled`: a really disabled button
 // drops keyboard focus to the page just as the user reaches the limit.
@@ -41,7 +50,7 @@ function step(delta: number): void {
       type="button"
       :class="{ 'stepper__button--remove': removes }"
       :aria-label="removes ? `Remove ${label} from cart` : 'Decrease quantity'"
-      :aria-disabled="(quantity <= min && !removable) || undefined"
+      :aria-disabled="(!removes && quantity <= min) || undefined"
       @click="step(-1)"
     >
       <svg
@@ -59,10 +68,16 @@ function step(delta: number): void {
       </svg>
       <template v-else>−</template>
     </button>
-    <output class="stepper__value" :aria-live="silent ? undefined : 'polite'">
+    <!-- <output> is a live region by itself, so a silent value is a plain span. -->
+    <component
+      :is="silent ? 'span' : 'output'"
+      class="stepper__value"
+      :aria-live="silent ? undefined : 'polite'"
+    >
       {{ quantity }}
-    </output>
+    </component>
     <button
+      ref="increase"
       class="stepper__button"
       type="button"
       aria-label="Increase quantity"
@@ -78,7 +93,9 @@ function step(delta: number): void {
 .stepper {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--color-border-strong);
+  /* An outline, not a border: it takes no room, so the buttons keep the full 44px tap target. */
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: -1px;
   border-radius: var(--radius-full);
   background: var(--color-surface);
 }
@@ -87,8 +104,7 @@ function step(delta: number): void {
   display: grid;
   place-items: center;
   width: var(--tap-size);
-  /* Inside the 1px border, so the whole control is exactly one tap target tall, like a button. */
-  height: calc(var(--tap-size) - 2px);
+  height: var(--tap-size);
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;

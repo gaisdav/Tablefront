@@ -17,43 +17,22 @@ const emit = defineEmits<{
   'change-quantity': [item: MenuItem, quantity: number]
 }>()
 
-// "Add" turns into the stepper and back, so the button the user just pressed disappears. Focus
-// goes to where the same finger or key would carry on: the + after adding, "Add" after removing.
-// Only changes made on this card move focus; the cart changing elsewhere must not steal it.
+// "Add" turns into the stepper and back, so the button the user just pressed disappears. If focus
+// was on it, it goes to where the same finger or key would carry on: the + after adding, "Add"
+// after removing. Focus elsewhere (the drawer, another card) is never taken, so the cart changing
+// from somewhere else cannot steal it, and no timing between click and render is involved.
 const actions = useTemplateRef<HTMLElement>('actions')
-let focusNext: 'stepper' | 'add' | null = null
+const stepper = useTemplateRef<InstanceType<typeof QuantityStepper>>('stepper')
 
-// The wish only lasts until the update it caused has been rendered. If the click changed nothing
-// (the parent ignored it), it must not linger and pull focus when the cart changes later.
-// Called after the emit: by then the parent's change has scheduled a render, and `nextTick` waits
-// for that render; asked any earlier, it would resolve before it and the wish would be gone.
-function expireFocusWish(): void {
-  void nextTick(() => {
-    focusNext = null
-  })
-}
-
-function add(): void {
-  focusNext = 'stepper'
-  emit('add', item)
-  expireFocusWish()
-}
-
-function change(quantity: number): void {
-  if (quantity === 0) focusNext = 'add'
-  emit('change-quantity', item, quantity)
-  expireFocusWish()
-}
-
+// A `pre` watcher runs before the DOM is patched, so the old control is still there to ask.
 watch(
   () => quantityInCart > 0,
-  async () => {
-    const target = focusNext
-    focusNext = null
+  async (hasSome) => {
+    const hadFocus = actions.value?.contains(document.activeElement) ?? false
+    if (!hadFocus) return
     await nextTick()
-    if (target === 'stepper')
-      actions.value?.querySelector<HTMLElement>('[aria-label="Increase quantity"]')?.focus()
-    else if (target === 'add') actions.value?.querySelector<HTMLElement>('[data-add]')?.focus()
+    if (hasSome) stepper.value?.focusIncrease()
+    else actions.value?.querySelector<HTMLElement>('[data-add]')?.focus()
   },
 )
 </script>
@@ -81,34 +60,38 @@ watch(
         <p class="card__price">{{ formatCents(item.priceCents) }}</p>
       </div>
       <p class="card__description">{{ item.description }}</p>
-      <ul
-        v-if="item.allergens.length > 0"
-        class="card__allergens"
-        aria-label="Allergens"
-        role="list"
-      >
-        <li v-for="allergen in item.allergens" :key="allergen" class="badge">{{ allergen }}</li>
-      </ul>
-      <p v-if="!item.available" class="card__status">Sold out</p>
-      <div v-else ref="actions" class="card__actions">
-        <!-- Same height either way, so the card does not jump when one turns into the other. -->
-        <QuantityStepper
-          v-if="quantityInCart > 0"
-          :model-value="quantityInCart"
-          :label="item.name"
-          removable
-          silent
-          @update:model-value="change"
-        />
-        <BaseButton
-          v-else
-          data-add
-          variant="secondary"
-          :aria-label="`Add ${item.name} to cart`"
-          @click="add"
+      <!-- The footer sits at the bottom of the card whatever else is (or is not) above it. -->
+      <div class="card__footer">
+        <ul
+          v-if="item.allergens.length > 0"
+          class="card__allergens"
+          aria-label="Allergens"
+          role="list"
         >
-          Add
-        </BaseButton>
+          <li v-for="allergen in item.allergens" :key="allergen" class="badge">{{ allergen }}</li>
+        </ul>
+        <p v-if="!item.available" class="card__status">Sold out</p>
+        <div v-else ref="actions" class="card__actions">
+          <!-- Same height either way, so the card does not jump when one turns into the other. -->
+          <QuantityStepper
+            v-if="quantityInCart > 0"
+            ref="stepper"
+            :model-value="quantityInCart"
+            :label="item.name"
+            removable
+            silent
+            @update:model-value="emit('change-quantity', item, $event)"
+          />
+          <BaseButton
+            v-else
+            data-add
+            variant="secondary"
+            :aria-label="`Add ${item.name} to cart`"
+            @click="emit('add', item)"
+          >
+            Add
+          </BaseButton>
+        </div>
       </div>
     </div>
   </article>
@@ -185,8 +168,6 @@ watch(
 }
 
 .card__description {
-  /* Takes the spare height, so allergens and the action line up along the bottom of every card. */
-  flex-grow: 1;
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-muted);
@@ -194,6 +175,13 @@ watch(
   -webkit-line-clamp: 3;
   line-clamp: 3;
   -webkit-box-orient: vertical;
+}
+
+.card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
 }
 
 .card__allergens {

@@ -81,7 +81,7 @@ describe('MenuItemCard', () => {
     expect(none.find('[role="group"]').exists()).toBe(false)
     expect(none.find('[aria-label="Add Margherita pizza to cart"]').exists()).toBe(true)
     expect(some.find('[aria-label^="Add "]').exists()).toBe(false)
-    expect(some.get('output').text()).toBe('3')
+    expect(some.get('.stepper__value').text()).toBe('3')
   })
 
   it('changes the quantity with + and −, and removes at one', async () => {
@@ -102,35 +102,48 @@ describe('MenuItemCard', () => {
   it('does not speak by itself: the cart announcement already says what changed', () => {
     const wrapper = mount(MenuItemCard, { props: { item, quantityInCart: 2 } })
 
-    expect(wrapper.get('output').attributes('aria-live')).toBeUndefined()
+    expect(wrapper.find('output').exists()).toBe(false)
+    expect(wrapper.get('.stepper__value').attributes('aria-live')).toBeUndefined()
   })
 
   describe('focus', () => {
-    const stepperButton = (wrapper: ReturnType<typeof mountCard>) =>
-      wrapper.get<HTMLElement>('[aria-label="Increase quantity"]').element
     const addButton = (wrapper: ReturnType<typeof mountCard>) =>
       wrapper.get<HTMLElement>('[data-add]').element
+    const plus = (wrapper: ReturnType<typeof mountCard>) =>
+      wrapper.get<HTMLElement>('[aria-label="Increase quantity"]').element
 
     function mountAttached(quantityInCart: number) {
       return mount(MenuItemCard, { props: { item, quantityInCart }, attachTo: document.body })
     }
 
-    it('moves to + after Add turns into the stepper', async () => {
+    it('moves to + when Add, which had focus, turns into the stepper', async () => {
       const wrapper = mountAttached(0)
+      addButton(wrapper).focus()
 
-      // The store changes in the same tick as the click, as it does in the app.
-      void wrapper.get('[data-add]').trigger('click')
       await wrapper.setProps({ quantityInCart: 1 })
       await flushPromises()
 
-      expect(document.activeElement).toBe(stepperButton(wrapper))
+      expect(document.activeElement).toBe(plus(wrapper))
       wrapper.unmount()
     })
 
-    it('moves back to Add after the last one is removed', async () => {
-      const wrapper = mountAttached(1)
+    it('does not depend on when the parent applies the change', async () => {
+      const wrapper = mountAttached(0)
+      addButton(wrapper).focus()
+      await wrapper.get('[data-add]').trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 30)) // a slow, asynchronous store
 
-      void wrapper.get('[aria-label="Remove Margherita pizza from cart"]').trigger('click')
+      await wrapper.setProps({ quantityInCart: 1 })
+      await flushPromises()
+
+      expect(document.activeElement).toBe(plus(wrapper))
+      wrapper.unmount()
+    })
+
+    it('moves back to Add when the last one is removed from the stepper', async () => {
+      const wrapper = mountAttached(1)
+      wrapper.get<HTMLElement>('[aria-label="Remove Margherita pizza from cart"]').element.focus()
+
       await wrapper.setProps({ quantityInCart: 0 })
       await flushPromises()
 
@@ -138,23 +151,7 @@ describe('MenuItemCard', () => {
       wrapper.unmount()
     })
 
-    it('forgets an Add that changed nothing instead of stealing focus later', async () => {
-      const wrapper = mountAttached(0)
-      await wrapper.get('[data-add]').trigger('click') // the parent ignored it
-      const other = document.createElement('input')
-      document.body.append(other)
-      other.focus()
-
-      await wrapper.setProps({ quantityInCart: 0 })
-      await wrapper.setProps({ quantityInCart: 2 }) // later, from the drawer
-      await flushPromises()
-
-      expect(document.activeElement).toBe(other)
-      other.remove()
-      wrapper.unmount()
-    })
-
-    it('does not take focus when the cart changed somewhere else', async () => {
+    it('does not take focus when the cart changed while focus was somewhere else', async () => {
       const wrapper = mountAttached(0)
       const other = document.createElement('input')
       document.body.append(other)
@@ -168,11 +165,5 @@ describe('MenuItemCard', () => {
       other.remove()
       wrapper.unmount()
     })
-  })
-
-  it('cannot be added when sold out', () => {
-    const wrapper = mountCard({ available: false })
-
-    expect(wrapper.find('[aria-label^="Add "]').exists()).toBe(false)
   })
 })

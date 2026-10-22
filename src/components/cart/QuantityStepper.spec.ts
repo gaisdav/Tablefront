@@ -66,6 +66,18 @@ describe('QuantityStepper', () => {
     expect(mountStepper(2).get('output').attributes('aria-live')).toBe('polite')
   })
 
+  it('exposes focus on the + for a parent that swaps controls', () => {
+    const wrapper = mount(QuantityStepper, {
+      props: { modelValue: 2, label: 'Margherita pizza' },
+      attachTo: document.body,
+    })
+
+    wrapper.vm.focusIncrease()
+
+    expect(document.activeElement).toBe(increase(wrapper).element)
+    wrapper.unmount()
+  })
+
   describe('removable', () => {
     it('turns the minus into a remove button at the minimum, which sets 0', async () => {
       const wrapper = mountStepper(1, { removable: true })
@@ -78,6 +90,16 @@ describe('QuantityStepper', () => {
       expect(wrapper.emitted('update:modelValue')).toEqual([[0]])
     })
 
+    it('is about the last unit only, whatever the minimum is', () => {
+      const atZero = mountStepper(0, { removable: true, min: 0 })
+
+      expect(atZero.find('[aria-label^="Remove"]').exists()).toBe(false)
+      expect(decrease(atZero).attributes('aria-disabled')).toBe('true')
+      expect(
+        mountStepper(1, { removable: true, min: 0 }).find('[aria-label^="Remove"]').exists(),
+      ).toBe(true)
+    })
+
     it('is an ordinary minus above the minimum', async () => {
       const wrapper = mountStepper(2, { removable: true })
 
@@ -88,7 +110,11 @@ describe('QuantityStepper', () => {
     })
   })
 
-  it('can be silent', () => {
-    expect(mountStepper(2, { silent: true }).get('output').attributes('aria-live')).toBeUndefined()
+  it('can be silent: no <output> (an implicit live region) and no aria-live', () => {
+    const wrapper = mountStepper(2, { silent: true })
+
+    expect(wrapper.find('output').exists()).toBe(false)
+    expect(wrapper.get('.stepper__value').text()).toBe('2')
+    expect(wrapper.get('.stepper__value').attributes('aria-live')).toBeUndefined()
   })
 })
