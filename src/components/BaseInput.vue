@@ -21,6 +21,7 @@ const {
   type = 'text',
   hint,
   error,
+  multiline,
 } = defineProps<{
   /** Always visible: a placeholder is not a label. */
   label: string
@@ -28,6 +29,8 @@ const {
   hint?: string
   /** Shown under the field and announced with it; also marks the field invalid. */
   error?: string
+  /** A text area for longer text; `type` does not apply. */
+  multiline?: boolean
 }>()
 
 const id = useId()
@@ -43,7 +46,17 @@ const describedBy = computed(() => {
 <template>
   <div class="field" :class="attrs.class" :style="attrs.style">
     <label class="field__label" :for="id">{{ label }}</label>
+    <textarea
+      v-if="multiline"
+      v-bind="inputAttrs()"
+      :id="id"
+      v-model="model"
+      class="field__input field__input--multiline"
+      :aria-invalid="error ? true : undefined"
+      :aria-describedby="describedBy"
+    />
     <input
+      v-else
       v-bind="inputAttrs()"
       :id="id"
       v-model="model"
@@ -76,6 +89,11 @@ const describedBy = computed(() => {
   border-radius: var(--radius-md);
   background: var(--color-surface);
   transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.field__input--multiline {
+  min-height: 6rem;
+  resize: vertical;
 }
 
 .field__input:hover {
