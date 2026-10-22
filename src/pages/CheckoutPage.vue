@@ -19,8 +19,10 @@ import {
 } from '@/domain/checkout'
 import { formatCents } from '@/domain/money'
 import { useCartStore } from '@/stores/cart'
+import { useMyOrdersStore } from '@/stores/myOrders'
 
 const cart = useCartStore()
+const myOrders = useMyOrdersStore()
 const router = useRouter()
 
 const form = reactive<CheckoutForm>({ name: '', phone: '', fulfillment: 'pickup', address: '' })
@@ -89,6 +91,7 @@ async function submit(): Promise<void> {
   submitting.value = true
   try {
     const order = await ordersApi.createOrder(buildOrderRequest(form, cart.lines))
+    myOrders.remember(order.id)
     await openPlacedOrder(order.id)
   } catch (caught) {
     if (isApiError(caught) && caught.status === 422) {

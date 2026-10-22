@@ -183,6 +183,39 @@ describe('checkout: placing the order', () => {
     })
   })
 
+  it('remembers the order for My orders', async () => {
+    const { wrapper, router } = await mountCheckout()
+    await fillValid(wrapper)
+
+    await submit(wrapper)
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('order')
+    })
+
+    const id = String(router.currentRoute.value.params.id)
+    await vi.waitFor(() => {
+      expect(localStorage.getItem('tablefront:orders')).toContain(id)
+    })
+    expect(wrapper.find('nav a[href="/orders"]').exists()).toBe(true)
+  })
+
+  it('does not remember an order that was not placed', async () => {
+    server.use(
+      mswHttp.post('/api/orders', () =>
+        HttpResponse.json({ error: { code: 'server_error', message: 'Down' } }, { status: 500 }),
+      ),
+    )
+    const { wrapper } = await mountCheckout()
+    await fillValid(wrapper)
+
+    await submit(wrapper)
+    await vi.waitFor(() => {
+      expect(wrapper.find('.problems').exists()).toBe(true)
+    })
+
+    expect(localStorage.getItem('tablefront:orders')).toBeNull()
+  })
+
   it('does not leave a checkout page behind in the history', async () => {
     const { wrapper, router } = await mountCheckout()
     await fillValid(wrapper)
