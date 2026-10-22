@@ -1,6 +1,7 @@
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import App from '@/App.vue'
+import { installSession } from '@/auth/installSession'
 import { createAppRouter } from '@/router'
 import '@/styles/index.css'
 
@@ -25,7 +26,11 @@ async function bootstrap(): Promise<void> {
       console.warn('The mock API could not start; requests will reach the real network.', error)
     }
   }
-  createApp(App).use(createPinia()).use(createAppRouter()).mount('#app')
+  const pinia = createPinia()
+  const router = createAppRouter()
+  // Before the router starts navigating, so the very first page already goes through the guard.
+  installSession(router, pinia)
+  createApp(App).use(pinia).use(router).mount('#app')
 }
 
 void bootstrap()
