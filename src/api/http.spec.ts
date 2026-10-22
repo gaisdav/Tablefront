@@ -79,6 +79,28 @@ describe('http client: success', () => {
   })
 })
 
+describe('http client: bodies and URLs', () => {
+  it('treats an empty 2xx body as no content', async () => {
+    server.use(mswHttp.put('/api/things/1', () => new HttpResponse(null, { status: 200 })))
+
+    const { client } = makeClient()
+
+    await expect(client.put('/things/1', { body: {} })).resolves.toBeUndefined()
+  })
+
+  it.each([
+    ['/api/', '/things'],
+    ['/api', 'things'],
+    ['/api/', 'things'],
+  ])('joins base %s and path %s with exactly one slash', async (baseUrl, path) => {
+    server.use(mswHttp.get('/api/things', () => HttpResponse.json({ ok: true })))
+
+    const { client } = makeClient({ baseUrl })
+
+    expect(await client.get(path)).toEqual({ ok: true })
+  })
+})
+
 describe('http client: auth', () => {
   it('injects the bearer token when there is one', async () => {
     let authorization: string | null = null
@@ -139,6 +161,24 @@ describe('http client: auth', () => {
 
     expect(onUnauthorized).not.toHaveBeenCalled()
     expect(error).toMatchObject({ status: 401, code: 'invalid_credentials' })
+  })
+})
+
+describe('http client: stale sessions', () => {
+  it('ignores a 401 for a token that was replaced while the request was in flight', async () => {
+    let token: string | null = 'old'
+    server.use(
+      mswHttp.get('/api/admin/orders', () => {
+        token = 'new' // the user logged out and back in while this request was pending
+        return HttpResponse.json(errorBody('unauthorized', 'Session expired'), { status: 401 })
+      }),
+    )
+
+    const { client, onUnauthorized } = makeClient({ getToken: () => token })
+    const error = await rejection(client.get('/admin/orders'))
+
+    expect(onUnauthorized).not.toHaveBeenCalled()
+    expect(error).toMatchObject({ status: 401 })
   })
 })
 
@@ -251,6 +291,34 @@ describe('http client: failures without a response', () => {
     expect(error).toMatchObject({ status: 0, code: 'timeout' })
   })
 
+  it('reports a timeout that fires while the body is still being read', async () => {
+    // The one test that stubs fetch: aborting a response mid-body makes undici throw an
+    // unrelated assertion when MSW closes the socket, so MSW cannot stage this case.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      const signal = init?.signal
+      const response = new Response(null, { status: 200 })
+      vi.spyOn(response, 'text').mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => {
+              reject(new DOMException('Timed out', 'TimeoutError'))
+            })
+          }),
+      )
+      return Promise.resolve(response)
+    })
+
+    try {
+      const { client } = makeClient({ timeoutMs: 30 })
+      const error = await rejection(client.get('/things'))
+
+      expect(error).toBeInstanceOf(ApiError)
+      expect(error).toMatchObject({ status: 0, code: 'timeout' })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('lets a per-request timeout override the client default', async () => {
     server.use(
       mswHttp.get('/api/things', async () => {
@@ -283,6 +351,23 @@ describe('http client: cancellation', () => {
 
     expect(error).not.toBeInstanceOf(ApiError)
     expect(isAbortError(error)).toBe(true)
+  })
+
+  it("passes through the caller's own abort reason untouched", async () => {
+    server.use(
+      mswHttp.get('/api/things', async () => {
+        await delay('infinite')
+        return HttpResponse.json([])
+      }),
+    )
+
+    const { client } = makeClient()
+    const controller = new AbortController()
+    const reason = new Error('route changed')
+    const pending = rejection(client.get('/things', { signal: controller.signal }))
+    controller.abort(reason)
+
+    expect(await pending).toBe(reason)
   })
 
   it('rejects immediately when the signal is already aborted', async () => {

@@ -30,7 +30,9 @@ export interface HttpClient {
 
 function buildUrl(baseUrl: string, path: string, query: RequestOptions['query']): URL {
   // Resolved against the page origin so the same code works in the browser and in jsdom tests.
-  const url = new URL(`${baseUrl}${path}`, globalThis.location.href)
+  const prefix = baseUrl.replace(/\/+$/, '')
+  const suffix = path.startsWith('/') ? path : `/${path}`
+  const url = new URL(`${prefix}${suffix}`, globalThis.location.href)
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== '') url.searchParams.set(key, value)
   }
@@ -42,6 +44,42 @@ function buildUrl(baseUrl: string, path: string, query: RequestOptions['query'])
 function asResponse<T>(body: unknown): T {
   // eslint-disable-next-line no-restricted-syntax -- response shape is the API contract; only error bodies are validated
   return body as T
+}
+
+type ParsedBody = { ok: true; value: unknown } | { ok: false }
+
+// An empty body is valid (204, or a 2xx with nothing to say); anything else must be JSON.
+function parseBody(text: string): ParsedBody {
+  if (text === '') return { ok: true, value: undefined }
+  try {
+    const value: unknown = JSON.parse(text)
+    return { ok: true, value }
+  } catch {
+    return { ok: false }
+  }
+}
+
+// fetch rejects with the reason of whichever signal aborted first, so comparing it with the
+// caller's reason tells a cancellation apart from a timeout or network failure that merely
+// happened around the same time.
+function failureToThrow(
+  error: unknown,
+  callerSignal: AbortSignal | undefined,
+  timeoutSignal: AbortSignal,
+): unknown {
+  if (callerSignal?.aborted === true && error === callerSignal.reason) return error
+  if (timeoutSignal.aborted) {
+    return new ApiError({
+      status: 0,
+      code: 'timeout',
+      message: 'The request timed out. Please try again.',
+    })
+  }
+  return new ApiError({
+    status: 0,
+    code: 'network_error',
+    message: 'Network error. Check your connection and try again.',
+  })
 }
 
 export function createHttpClient(config: HttpClientConfig): HttpClient {
@@ -59,7 +97,10 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
         ? timeoutSignal
         : AbortSignal.any([options.signal, timeoutSignal])
 
+    // The body is read inside the same try as the request, so a timeout or abort that fires
+    // mid-body is classified like any other.
     let response: Response
+    let text: string
     try {
       response = await fetch(buildUrl(config.baseUrl, path, options.query), {
         method,
@@ -67,42 +108,32 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
         signal,
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       })
+      text = await response.text()
     } catch (error) {
-      if (options.signal?.aborted === true) throw error
-      if (timeoutSignal.aborted) {
-        throw new ApiError({
-          status: 0,
-          code: 'timeout',
-          message: 'The request timed out. Please try again.',
-        })
-      }
-      throw new ApiError({
-        status: 0,
-        code: 'network_error',
-        message: 'Network error. Check your connection and try again.',
-      })
+      throw failureToThrow(error, options.signal, timeoutSignal)
     }
+
+    const body = parseBody(text)
 
     if (!response.ok) {
-      // Only a request that sent a token can mean "session expired". A 401 without one is
-      // an ordinary failure, e.g. wrong credentials on the login form.
-      if (response.status === 401 && token !== null) config.onUnauthorized()
-      const body: unknown = await response.json().catch(() => null)
-      throw parseApiError(response.status, body)
+      const error = parseApiError(response.status, body.ok ? body.value : null)
+      // Only a 401 for the token that is still current means "session expired". No token means
+      // an ordinary failure (wrong password on the login form); a replaced token means this
+      // response belongs to a session that has already ended.
+      if (response.status === 401 && token !== null && token === config.getToken()) {
+        config.onUnauthorized()
+      }
+      throw error
     }
 
-    if (response.status === 204) return undefined
-    try {
-      const body: unknown = await response.json()
-      return body
-    } catch (error) {
-      if (options.signal?.aborted === true) throw error
+    if (!body.ok) {
       throw new ApiError({
         status: response.status,
         code: 'invalid_response',
         message: 'The server sent a response that could not be read.',
       })
     }
+    return body.value
   }
 
   return {
