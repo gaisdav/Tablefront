@@ -47,3 +47,27 @@ jobs:
       - name: Container log
         if: failure()
         run: docker logs tablefront
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      # Builds the demo (mock API on), serves it, and runs the browser tests against it.
+      - run: pnpm test:e2e
+      # Traces and screenshots of the failed tests, to replay with `playwright show-trace`.
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-failures
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
