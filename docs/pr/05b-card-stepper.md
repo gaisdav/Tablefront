@@ -7,7 +7,7 @@ A follow-up to the cart (PR 05), requested after trying it: adding a dish should
 - **"Add" turns into `− 1 +`** on the dish card as soon as the dish is in the cart. `+` and `−` change the quantity; at 1 the `−` becomes a bin icon labelled "Remove <dish> from cart" and removes the dish, and the card shows "Add" again.
 - **Focus follows the user.** The pressed button disappears, so focus would fall to the page. After Add it moves to `+`, after removing the last one it moves back to "Add". Only a change made on that card moves focus; the drawer or a notice changing the cart never steals it, and a click the parent ignored does not leave a pending focus behind.
 - **No double announcement.** The card's stepper is silent (`silent` prop on `QuantityStepper`): the header live region already says "Margherita pizza: 2 in cart. Cart total …". The drawer's steppers still speak for themselves, as before.
-- **No layout jump.** The action row has the height of a tap target in both states, so the card does not change size. Cards in a row now line up their allergens and Add/stepper along the bottom, which they did not before.
+- **No layout jump.** "Add" and the stepper are the same size (8rem × 44 px, measured in Chrome at both widths), so one turning into the other shifts nothing, and the card does not change size. Cards in a row now line up their allergens and Add/stepper along the bottom, which they did not before.
 - The "N in cart" text is gone: the stepper shows the number.
 
 `QuantityStepper` gets `removable` (the minus removes at the minimum) and `silent`. `MenuItemCard` stays presentational: it emits `add` and `change-quantity` (0 means remove), `MenuPage` forwards them to the cart store.

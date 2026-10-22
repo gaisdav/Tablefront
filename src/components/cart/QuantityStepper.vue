@@ -87,7 +87,8 @@ function step(delta: number): void {
   display: grid;
   place-items: center;
   width: var(--tap-size);
-  height: var(--tap-size);
+  /* Inside the 1px border, so the whole control is exactly one tap target tall, like a button. */
+  height: calc(var(--tap-size) - 2px);
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;
@@ -116,6 +117,7 @@ function step(delta: number): void {
 }
 
 .stepper__value {
+  flex: 1;
   min-width: 2rem;
   font-variant-numeric: tabular-nums;
   font-weight: var(--weight-semibold);
