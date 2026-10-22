@@ -33,3 +33,17 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the image
+        run: docker build -t tablefront .
+      - name: Serve it and check what it serves
+        run: |
+          docker run -d --name tablefront -p 8080:8080 tablefront
+          scripts/check-image.sh http://localhost:8080
+      - name: Container log
+        if: failure()
+        run: docker logs tablefront
