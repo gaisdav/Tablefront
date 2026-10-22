@@ -16,9 +16,12 @@ async function bootstrap(): Promise<void> {
         onUnhandledFrame: 'bypass',
         serviceWorker: { url: `${import.meta.env.BASE_URL}mockServiceWorker.js` },
       })
-    } catch {
-      // No service worker (unsupported browser, blocked by settings): mount anyway. Every
-      // request then fails and the app shows its error states instead of a blank page.
+    } catch (error) {
+      // No service worker (unsupported browser, blocked by settings, a missing or mismatched
+      // worker file): mount anyway, so the app shows its error states instead of a blank page,
+      // but say why, or every request would just look like a mysterious failure.
+      // eslint-disable-next-line no-console -- the one diagnostic for a broken dev/demo setup
+      console.warn('The mock API could not start; requests will reach the real network.', error)
     }
   }
   createApp(App).use(createAppRouter()).mount('#app')

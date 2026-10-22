@@ -15,43 +15,52 @@ function mountChips(modelValue: string | undefined) {
 describe('CategoryChips', () => {
   it('offers "All" followed by every category', () => {
     const labels = mountChips(undefined)
-      .findAll('button')
-      .map((button) => button.text())
+      .findAll('label')
+      .map((label) => label.text())
 
     expect(labels).toEqual(['All', 'Starters', 'Mains'])
   })
 
-  it('is a labelled group of toggle buttons', () => {
+  it('is a labelled radio group: one choice out of several', () => {
     const wrapper = mountChips(undefined)
 
-    expect(wrapper.get('[role="group"]').attributes('aria-label')).toBe('Filter by category')
-    expect(
-      wrapper.findAll('button').every((button) => button.attributes('type') === 'button'),
-    ).toBe(true)
+    expect(wrapper.get('fieldset legend').text()).toBe('Filter by category')
+    const radios = wrapper.findAll<HTMLInputElement>('input')
+    expect(radios.every((radio) => radio.attributes('type') === 'radio')).toBe(true)
+    expect(new Set(radios.map((radio) => radio.attributes('name'))).size).toBe(1)
   })
 
-  it('marks "All" as pressed when nothing is selected', () => {
-    const pressed = mountChips(undefined)
-      .findAll('button')
-      .map((button) => button.attributes('aria-pressed'))
+  it('checks "All" when nothing is selected', () => {
+    const checked = mountChips(undefined)
+      .findAll<HTMLInputElement>('input')
+      .map((radio) => radio.element.checked)
 
-    expect(pressed).toEqual(['true', 'false', 'false'])
+    expect(checked).toEqual([true, false, false])
   })
 
-  it('marks only the selected category as pressed', () => {
-    const pressed = mountChips('cat-mains')
-      .findAll('button')
-      .map((button) => button.attributes('aria-pressed'))
+  it('checks only the selected category', () => {
+    const checked = mountChips('cat-mains')
+      .findAll<HTMLInputElement>('input')
+      .map((radio) => radio.element.checked)
 
-    expect(pressed).toEqual(['false', 'false', 'true'])
+    expect(checked).toEqual([false, false, true])
   })
 
   it('emits the category id when one is chosen, and undefined for "All"', async () => {
     const wrapper = mountChips('cat-mains')
+    const radios = wrapper.findAll<HTMLInputElement>('input')
 
-    await wrapper.findAll('button')[1]?.trigger('click')
-    await wrapper.findAll('button')[0]?.trigger('click')
+    await radios[1]?.setValue()
+    await radios[0]?.setValue()
 
     expect(wrapper.emitted('update:modelValue')).toEqual([['cat-starters'], [undefined]])
+  })
+
+  it('keeps every radio at least as tall as a touch target', () => {
+    // The visible pill is the label; the real input is stretched over it so the whole pill is clickable.
+    const wrapper = mountChips(undefined)
+
+    expect(wrapper.findAll('.chip__label')).toHaveLength(3)
+    expect(wrapper.findAll('.chip').every((chip) => chip.find('input').exists())).toBe(true)
   })
 })

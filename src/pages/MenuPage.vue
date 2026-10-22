@@ -10,30 +10,55 @@ import CategoryChips from '@/components/menu/CategoryChips.vue'
 import MenuItemCard from '@/components/menu/MenuItemCard.vue'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useMenuFilters } from '@/composables/useMenuFilters'
+import type { MenuItem } from '@/types/domain'
 
 const { category, q, searchInput, setCategory, clearFilters } = useMenuFilters()
 
 const categories = useAsyncState((signal) => menuApi.listCategories(signal))
 
+/** The dishes together with the filters they were fetched for. */
+interface MenuResult {
+  filters: { category: string | undefined; q: string }
+  items: MenuItem[]
+}
+
 // Runs again, and drops any response still in flight, whenever a filter in the URL changes.
-const items = useAsyncState(
-  (signal) => menuApi.listMenuItems({ categoryId: category.value, q: q.value }, signal),
-  {
-    watch: [category, q],
+// The result remembers its own filters: while a new request is loading, the page still shows the
+// previous result, and the text describing it (count, "no dishes match ...") must describe
+// *that* result, not whatever the URL says now.
+const menu = useAsyncState(
+  async (signal): Promise<MenuResult> => {
+    const filters = { category: category.value, q: q.value }
+    const items = await menuApi.listMenuItems(
+      { categoryId: filters.category, q: filters.q },
+      signal,
+    )
+    return { filters, items }
   },
+  { watch: [category, q] },
 )
 
-const hasFilters = computed(() => category.value !== undefined || q.value !== '')
+const isNoResults = (result: MenuResult) => result.items.length === 0
 
-const resultCount = computed(() => {
-  const count = items.data.value?.length
+// The single live announcement for the list: "Loading…", then the count. (The boundaries below
+// get an empty loading label so the same moment is not announced twice.) Errors are announced
+// by their own alert, so the line goes quiet instead of repeating a stale count next to it.
+const status = computed(() => {
+  if (menu.error.value !== null) return ''
+  if (menu.isLoading.value) return 'Loading…'
+  const count = menu.data.value?.items.length
   if (count === undefined) return ''
   return `${String(count)} ${count === 1 ? 'dish' : 'dishes'}`
 })
 
-const emptyTitle = computed(() =>
-  q.value === '' ? 'No dishes in this category' : `No dishes match “${q.value}”`,
+const shownFilters = computed(() => menu.data.value?.filters)
+const hasShownFilters = computed(
+  () => shownFilters.value?.category !== undefined || (shownFilters.value?.q ?? '') !== '',
 )
+const emptyTitle = computed(() => {
+  const text = shownFilters.value?.q ?? ''
+  return text === '' ? 'No dishes in this category' : `No dishes match “${text}”`
+})
 </script>
 
 <template>
@@ -59,7 +84,7 @@ const emptyTitle = computed(() =>
           :data="categories.data.value"
           :error="categories.error.value"
           :is-loading="categories.isLoading.value"
-          loading-label="Loading categories"
+          loading-label=""
           @retry="categories.execute"
         >
           <template #loading>
@@ -91,15 +116,16 @@ const emptyTitle = computed(() =>
       </div>
     </div>
 
-    <p class="results text-muted" role="status">{{ resultCount }}</p>
+    <p class="results text-muted" role="status">{{ status }}</p>
 
-    <div :class="{ 'is-refreshing': items.data.value !== undefined && items.isLoading.value }">
+    <div :class="{ 'is-refreshing': menu.data.value !== undefined && menu.isLoading.value }">
       <AsyncBoundary
-        :data="items.data.value"
-        :error="items.error.value"
-        :is-loading="items.isLoading.value"
-        loading-label="Loading the menu"
-        @retry="items.execute"
+        :data="menu.data.value"
+        :error="menu.error.value"
+        :is-loading="menu.isLoading.value"
+        :is-empty="isNoResults"
+        loading-label=""
+        @retry="menu.execute"
       >
         <template #loading>
           <div class="grid">
@@ -114,9 +140,11 @@ const emptyTitle = computed(() =>
         <template #empty>
           <EmptyState
             :title="emptyTitle"
-            :description="hasFilters ? 'Try a different word or clear the filters.' : undefined"
+            :description="
+              hasShownFilters ? 'Try a different word or clear the filters.' : undefined
+            "
           >
-            <template v-if="hasFilters" #action>
+            <template v-if="hasShownFilters" #action>
               <BaseButton variant="secondary" @click="clearFilters">Clear filters</BaseButton>
             </template>
           </EmptyState>
@@ -124,7 +152,7 @@ const emptyTitle = computed(() =>
 
         <template #default="{ data }">
           <ul class="grid" role="list">
-            <li v-for="item in data" :key="item.id">
+            <li v-for="item in data.items" :key="item.id">
               <MenuItemCard :item="item" />
             </li>
           </ul>
@@ -178,8 +206,9 @@ const emptyTitle = computed(() =>
   background: var(--color-surface);
 }
 
-/* Old results stay visible while new ones load; dimming says "these are on their way out". */
-.is-refreshing .grid {
+/* Old results stay visible while new ones load; dimming says "these are on their way out". It
+   covers whatever is showing: the list, or the empty state. */
+.is-refreshing {
   opacity: 0.55;
   transition: opacity var(--duration-base) var(--ease-out);
 }

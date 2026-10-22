@@ -37,7 +37,10 @@ const searchBox = (wrapper: VueWrapper) => wrapper.get<HTMLInputElement>('input[
 const chip = (wrapper: VueWrapper, label: string) => {
   const found = wrapper.findAll('.chip').find((candidate) => candidate.text() === label)
   if (found === undefined) throw new Error(`No "${label}" chip`)
-  return found
+  return {
+    isChecked: () => found.get<HTMLInputElement>('input').element.checked,
+    choose: () => found.get('input').setValue(),
+  }
 }
 
 function dish(name: string): MenuItem {
@@ -62,13 +65,14 @@ describe('MenuPage: loading and content', () => {
   it('shows a skeleton while loading, then the dishes and the categories', async () => {
     const { wrapper } = await mountMenu()
 
-    expect(wrapper.text()).toContain('Loading the menu')
+    expect(wrapper.get('.results').text()).toBe('Loading…')
     expect(wrapper.find('.card').exists()).toBe(false)
 
     await untilLoaded(wrapper)
 
     expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     expect(wrapper.find('.skeleton').exists()).toBe(false)
+    expect(wrapper.get('.results').text()).toBe(`${String(availableCount)} dishes`)
     expect(wrapper.findAll('.chip').map((button) => button.text())).toEqual([
       'All',
       'Starters',
@@ -93,21 +97,21 @@ describe('MenuPage: category filter', () => {
     const { wrapper, router } = await mountMenu()
     await untilLoaded(wrapper)
 
-    await chip(wrapper, 'Desserts').trigger('click')
+    await chip(wrapper, 'Desserts').choose()
     await vi.waitFor(() => {
       expect(names(wrapper)).toEqual(['Tiramisu', 'Schwarzwälder Kirschtorte', 'Apfelstrudel'])
     })
 
     expect(router.currentRoute.value.query).toEqual({ category: 'cat-desserts' })
-    expect(chip(wrapper, 'Desserts').attributes('aria-pressed')).toBe('true')
-    expect(chip(wrapper, 'All').attributes('aria-pressed')).toBe('false')
+    expect(chip(wrapper, 'Desserts').isChecked()).toBe(true)
+    expect(chip(wrapper, 'All').isChecked()).toBe(false)
   })
 
   it('"All" removes the category from the URL', async () => {
     const { wrapper, router } = await mountMenu('/?category=cat-drinks')
     await untilLoaded(wrapper)
 
-    await chip(wrapper, 'All').trigger('click')
+    await chip(wrapper, 'All').choose()
     await vi.waitFor(() => {
       expect(wrapper.findAll('.card')).toHaveLength(availableCount)
     })
@@ -126,7 +130,7 @@ describe('MenuPage: category filter', () => {
     const { wrapper } = await mountMenu()
     await untilLoaded(wrapper)
 
-    await chip(wrapper, 'Drinks').trigger('click')
+    await chip(wrapper, 'Drinks').choose()
     await vi.waitFor(() => {
       expect(wrapper.find('.is-refreshing').exists()).toBe(true)
     })
@@ -148,7 +152,7 @@ describe('MenuPage: URL is the source of truth', () => {
 
     expect(names(wrapper)).toEqual(['Lemonade'])
     expect(searchBox(wrapper).element.value).toBe('lem')
-    expect(chip(wrapper, 'Drinks').attributes('aria-pressed')).toBe('true')
+    expect(chip(wrapper, 'Drinks').isChecked()).toBe(true)
   })
 
   it('follows the URL when it changes underneath, as back and forward do', async () => {
@@ -204,7 +208,7 @@ describe('MenuPage: debounced search', () => {
   it('does not add history entries while typing', async () => {
     const { wrapper, router } = await mountMenu()
     await untilLoaded(wrapper)
-    await chip(wrapper, 'Mains').trigger('click')
+    await chip(wrapper, 'Mains').choose()
     await vi.waitFor(() => {
       expect(router.currentRoute.value.query.category).toBe('cat-mains')
     })
@@ -290,6 +294,97 @@ describe('MenuPage: empty results', () => {
     await untilLoaded(wrapper)
 
     expect(wrapper.text()).toContain('No dishes in this category')
+  })
+})
+
+describe('MenuPage: text describes the result that is on screen', () => {
+  /** Answers the next request for `q` only after `ms`, so the test can look at the page in between. */
+  function slowFor(q: string, ms: number) {
+    server.use(
+      mswHttp.get('/api/menu-items', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('q') !== q) return undefined
+        await delay(ms)
+        return undefined
+      }),
+    )
+  }
+
+  it('keeps the old empty-state title, dimmed, until the new result arrives', async () => {
+    slowFor('pizza', 150)
+    const { wrapper, router } = await mountMenu('/?q=zzz')
+    await untilLoaded(wrapper)
+    expect(wrapper.text()).toContain('No dishes match “zzz”')
+
+    await router.push('/?q=pizza')
+    await vi.waitFor(() => {
+      expect(wrapper.find('.is-refreshing').exists()).toBe(true)
+    })
+
+    // The URL already says "pizza", but what is shown is still the answer to "zzz".
+    expect(wrapper.text()).toContain('No dishes match “zzz”')
+    expect(wrapper.text()).not.toContain('No dishes match “pizza”')
+
+    await vi.waitFor(() => {
+      expect(names(wrapper)).toEqual(['Margherita pizza', 'Diavola pizza'])
+    })
+    expect(wrapper.find('.is-refreshing').exists()).toBe(false)
+  })
+
+  it('says it is loading, instead of repeating the old count, while a new result is on its way', async () => {
+    slowFor('pizza', 150)
+    const { wrapper, router } = await mountMenu()
+    await untilLoaded(wrapper)
+    expect(wrapper.get('.results').text()).toBe(`${String(availableCount)} dishes`)
+
+    await router.push('/?q=pizza')
+    await vi.waitFor(() => {
+      expect(wrapper.get('.results').text()).toBe('Loading…')
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('.results').text()).toBe('2 dishes')
+    })
+  })
+
+  it('has a single live announcement for the list: the status line, not the skeleton region', async () => {
+    const { wrapper } = await mountMenu()
+
+    const announcements = wrapper
+      .findAll('[role="status"]')
+      .filter((region) => region.text() !== '')
+
+    expect(announcements.map((region) => region.text())).toEqual(['Loading…'])
+    await untilLoaded(wrapper)
+  })
+
+  it('goes quiet when a refresh fails, so a stale count is not read out next to the error', async () => {
+    const { wrapper } = await mountMenu()
+    await untilLoaded(wrapper)
+    expect(wrapper.get('.results').text()).not.toBe('')
+
+    setMockConditions({ errorRate: 'always' })
+    await chip(wrapper, 'Drinks').choose()
+    await vi.waitFor(() => {
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+    })
+
+    expect(wrapper.get('.results').text()).toBe('')
+  })
+
+  it('Clear filters wins over text that was still being typed', async () => {
+    const { wrapper, router } = await mountMenu('/?category=cat-drinks&q=zzz')
+    await untilLoaded(wrapper)
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await searchBox(wrapper).setValue('abc') // still inside the debounce window
+    const clear = wrapper.findAll('button').find((button) => button.text() === 'Clear filters')
+    await clear?.trigger('click')
+    await vi.advanceTimersByTimeAsync(500)
+    vi.useRealTimers()
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({})
+    expect(searchBox(wrapper).element.value).toBe('')
   })
 })
 

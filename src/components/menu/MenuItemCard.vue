@@ -55,11 +55,9 @@ defineProps<{ item: MenuItem }>()
   box-shadow: var(--shadow-sm);
 }
 
-.card--unavailable {
-  opacity: 0.65;
-}
-
-.card--unavailable .card__image {
+/* Only the picture is dimmed: fading the text as well would drop it below AA contrast. */
+.card--unavailable .card__media {
+  opacity: 0.5;
   filter: grayscale(1);
 }
 
