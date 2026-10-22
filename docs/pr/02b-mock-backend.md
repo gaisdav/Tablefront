@@ -16,8 +16,11 @@ Second half of PR 02. The app can now talk to a complete fake REST API; nothing 
 - **One `route()` wrapper instead of per-handler boilerplate.** It applies latency, failures and offline mode, so no handler can forget them. `adminRoute()` adds the bearer-token check on top, so a missing 401 is impossible by construction.
 - **The status table is not duplicated.** The PATCH handler calls `canTransition` from `src/domain/orderStatus.ts`, the same function the admin UI will use to decide which buttons to render. The 409 responses and the UI cannot disagree.
 - **The server owns names and prices.** An order request only carries item ids, quantities and notes. The handler looks up current names and prices and stores them on the order as snapshots, and the total is computed there. A client cannot send its own price.
+- **Validation is strict where a real backend would be.** Image URLs must be `http(s)` or `data:image/` (blank means no image), an order has at most 30 lines, notes are at most 200 characters, and `isRecord` rejects arrays so a malformed body is not mistaken for an object. Duplicate lines for one item are allowed on purpose: the same dish with different notes may be two lines in the cart.
 - **Validation builds the typed result instead of casting.** The request body is `unknown`; each field is checked and the validated value is assembled from the checked pieces, so there is no `as` in the mock backend.
-- **Latency is `none` in tests, `fast` by default.** The default applies in the browser demo; `src/test/setup.ts` resets everything before each test, so tests stay deterministic and fast. Latency tests use fake timers and a stubbed `Math.random`.
+- **Latency is `none` in tests, `fast` by default.** The default applies in the browser demo; `src/test/setup.ts` resets everything before each test, so tests stay deterministic and fast. Latency tests use fake timers and a stubbed `Math.random`; the error roll is skipped when the outcome is certain (`off`, `always`).
+- **Conditions run before the auth check.** A dropped connection or a failing gateway hits unauthenticated requests too, so under `errorRate: 'always'` an admin call without a token gets 500, not 401. To exercise the central 401 handling, turn failure injection off.
+- **Order of checks on `PATCH`/`PUT` by id:** an unknown id is 404 before the body is looked at, as in most REST servers.
 - **Offline is a network error, not a status code.** It uses MSW's `HttpResponse.error()`, so the client sees what a real lost connection looks like (`status: 0`, `network_error`) and applies no latency.
 - **Images are inline SVG data URIs.** The demo needs no binary assets and no external image host. Two items have `imageUrl: null` on purpose, to exercise the no-image fallback.
 - **Menu item search and filtering run on the "server".** `q` matches name and description, case-insensitively, as in the contract.
@@ -31,7 +34,7 @@ Second half of PR 02. The app can now talk to a complete fake REST API; nothing 
 
 ## Size
 
-About 1400 changed lines excluding the lockfile, but 340 of them are fixture data and 520 are tests, which leaves roughly 540 lines of logic. It stayed one PR because handlers, store, validation and hooks only make sense together, and the tests show them working. Say if you want it cut differently.
+About 1560 changed lines excluding the lockfile, but 340 of them are fixture data and 590 are tests, which leaves roughly 630 lines of logic. It stayed one PR because handlers, store, validation and hooks only make sense together, and the tests show them working. Say if you want it cut differently.
 
 ## How to verify
 
