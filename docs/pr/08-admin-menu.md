@@ -32,3 +32,19 @@ New small building blocks: `BaseSelect`, `BaseCheckbox`, `ToggleSwitch`, a `mult
 - Tests: money parsing and formatting; the form rules and request building; the form component (new and existing dish, validation, focus, API errors, a failure with no field, double submit, dirty tracking including an undone change and allergens); the table and cards (both renderings, switch state and busy, Edit/Delete); `useAdminMenu` (loading, switch with apply, request body, rollback on refusal and network failure, quiet 401, no second change in flight, create in category order, update, 422 mapping, other failures, delete, delete of a dish already gone); `useConfirm`; the new fields; and the page end to end (list, search and URL, switch, add, edit, API errors, delete with Cancel and with confirmation, focus after a delete, closing a clean and a changed form, Escape, a fresh form after a discard, leaving the page with and without changes, the browser prompt only while there are changes, and none after leaving or saving).
 - Tests fail when their fix is removed: the discard question, the leave-page guard, the browser prompt and removing its listener, closing after a save, deleting without an answer, rollback of the switch, the in-flight check, the 404-as-deleted rule, the confirm queue and double submit.
 - In Chrome at 1280 px light and 375 px dark: the table and the cards, Escape on a typed form asks (focus on Cancel) and keeping it open works, add shows a toast and the new row, the switch, delete with its confirmation and focus on the heading, no console messages.
+
+## Review follow-up
+
+Fixed:
+
+- Saving an edit keeps the dish where it was in its category; only a new dish, or one moved to another category, goes to the end of its category (the list stays grouped like the API's).
+- The availability switch writes back only the availability, and the server's answer is no longer written over the dish: nothing else that changed meanwhile can be overwritten with an older copy. A "Try again" reload keeps the availability of a dish whose save is still on its way. Edit and Delete of that dish are busy until the save is over, and `save`/`remove` refuse it too.
+- The dishes are shown only once the categories are known as well, so a form can never start without categories to choose from.
+- The search box keeps exactly what is typed (a leading space included) and cannot lose letters: it filters from the typed text, and the URL follows after a pause, like the guest menu.
+- Allergen errors from the API go away when the allergens are changed; the name and description inputs stop at the API's limits (`maxlength` 80 and 500); a pasted image address is capped at 2000 characters.
+- `ToggleSwitch` is now a plain `checked` plus a `toggle` event (it was a `v-model` nobody used).
+
+Not changed:
+
+- `formatCents` still throws on a price that is not whole cents: that is a deliberate rule (a wrong price must not be shown), and the API contract guarantees integers. A render error in one row taking the page down is what the app-level error boundary of PR 09 is for.
+- Inline images (`data:image/…`) are still accepted, as the API does, because the dishes in the fixtures use them and editing one must not fail; the hint stays about http(s) addresses, which is what a person types.

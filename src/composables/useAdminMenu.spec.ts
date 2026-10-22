@@ -53,6 +53,29 @@ afterEach(() => {
   for (const scope of scopes.splice(0)) scope.stop()
 })
 
+describe('useAdminMenu: the categories come first', () => {
+  it('shows no dishes until the categories are known too, so a form never starts without them', async () => {
+    server.use(
+      mswHttp.get('/api/categories', async () => {
+        await delay(80)
+        return undefined
+      }),
+    )
+    const result = menu()
+
+    await vi.waitFor(() => {
+      expect(result.isLoading.value).toBe(true)
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(result.items.value).toBeUndefined()
+
+    await vi.waitFor(() => {
+      expect(result.items.value).toHaveLength(menuItems.length)
+    })
+    expect(result.categories.value.length).toBeGreaterThan(0)
+  })
+})
+
 describe('useAdminMenu: loading', () => {
   it('loads every dish, the sold-out ones too, and the categories', async () => {
     const result = menu()
@@ -85,7 +108,87 @@ describe('useAdminMenu: loading', () => {
   })
 })
 
-describe('useAdminMenu: the availability switch', () => {
+describe('useAdminMenu: the availability switch and other changes', () => {
+  it('keeps the chosen availability, and the fresh data, when the list is reloaded mid-save', async () => {
+    server.use(
+      mswHttp.put('/api/admin/menu-items/:id', async () => {
+        await delay(80)
+        return undefined
+      }),
+    )
+    const result = menu()
+    await loaded(result)
+    const saving = result.setAvailable(dish.id, false)
+    db.replaceMenuItem(dish.id, {
+      ...input,
+      name: dish.name,
+      categoryId: dish.categoryId,
+      priceCents: 4242,
+    })
+
+    result.reload()
+    await vi.waitFor(() => {
+      expect(result.items.value?.find((item) => item.id === dish.id)?.priceCents).toBe(4242)
+    })
+
+    expect(availableOf(result, dish.id)).toBe(false) // not flipped back by the snapshot
+    await saving
+    const settled = result.items.value?.find((item) => item.id === dish.id)
+    expect(settled?.available).toBe(false)
+    expect(settled?.priceCents).toBe(4242) // and the answer of the switch did not undo the new price
+  })
+
+  it('only undoes the availability when a save fails, not whatever else changed since', async () => {
+    server.use(
+      mswHttp.put('/api/admin/menu-items/:id', async () => {
+        await delay(80)
+        return HttpResponse.json(
+          { error: { code: 'server_error', message: 'Down' } },
+          { status: 500 },
+        )
+      }),
+    )
+    const result = menu()
+    await loaded(result)
+    const saving = result.setAvailable(dish.id, false)
+    db.replaceMenuItem(dish.id, {
+      ...input,
+      name: dish.name,
+      categoryId: dish.categoryId,
+      priceCents: 4242,
+    })
+    result.reload()
+    await vi.waitFor(() => {
+      expect(result.items.value?.find((item) => item.id === dish.id)?.priceCents).toBe(4242)
+    })
+
+    await saving
+
+    const settled = result.items.value?.find((item) => item.id === dish.id)
+    expect(settled?.available).toBe(true)
+    expect(settled?.priceCents).toBe(4242)
+  })
+
+  it('refuses to save or delete a dish while its availability is on its way', async () => {
+    server.use(
+      mswHttp.put('/api/admin/menu-items/:id', async () => {
+        await delay(80)
+        return undefined
+      }),
+    )
+    const result = menu()
+    await loaded(result)
+    const saving = result.setAvailable(dish.id, false)
+
+    const outcome = await result.save({ ...input, categoryId: dish.categoryId }, dish.id)
+    const deleted = await result.remove(dish.id)
+    await saving
+
+    expect(outcome.ok).toBe(false)
+    expect(deleted).toBe(false)
+    expect(db.getMenuItem(dish.id)?.name).toBe(dish.name)
+  })
+
   it('applies the change at once and keeps it when the server agrees', async () => {
     server.use(
       mswHttp.put('/api/admin/menu-items/:id', async () => {
@@ -231,6 +334,36 @@ describe('useAdminMenu: saving', () => {
       result.items.value?.filter((item) => item.categoryId === 'cat-desserts') ?? []
     expect(inCategory.at(-1)?.id).toBe(created?.id) // added last within its category
     // Grouped by category: each category appears as one run, not scattered.
+    const runs = (result.items.value ?? [])
+      .map((item) => item.categoryId)
+      .filter((id, index, all) => id !== all[index - 1])
+    expect(new Set(runs).size).toBe(runs.length)
+  })
+
+  it('keeps an edited dish where it was in its category', async () => {
+    const result = menu()
+    await loaded(result)
+    const mains = result.items.value?.filter((item) => item.categoryId === dish.categoryId) ?? []
+    const first = mains[0]
+    if (first === undefined) throw new Error('no dish in the category')
+    const before = result.items.value?.map((item) => item.id)
+
+    await result.save(
+      { ...input, name: 'Just a typo fixed', categoryId: first.categoryId },
+      first.id,
+    )
+
+    expect(result.items.value?.map((item) => item.id)).toEqual(before)
+  })
+
+  it('moves a dish that changed category to the end of the new one', async () => {
+    const result = menu()
+    await loaded(result)
+
+    await result.save({ ...input, categoryId: 'cat-desserts' }, dish.id)
+
+    const desserts = result.items.value?.filter((item) => item.categoryId === 'cat-desserts') ?? []
+    expect(desserts.at(-1)?.id).toBe(dish.id)
     const runs = (result.items.value ?? [])
       .map((item) => item.categoryId)
       .filter((id, index, all) => id !== all[index - 1])

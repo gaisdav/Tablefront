@@ -11,10 +11,23 @@ import type { Category, MenuItem } from '@/types/domain'
 export type SaveResult =
   { ok: true; item: MenuItem } | { ok: false; fields: MenuErrors; general: string[] }
 
-/** The same order the API uses: grouped by category, and within one in the order added. */
-function inCategoryOrder(items: readonly MenuItem[], categories: readonly Category[]): MenuItem[] {
+/**
+ * Puts a saved dish into the list. A dish that stays in its category keeps its place (an edit must
+ * not send it to the bottom); a new one, or one moved to another category, goes at the end of its
+ * category, which is where the API would put a new one. The list stays grouped by category.
+ */
+function place(
+  items: readonly MenuItem[],
+  saved: MenuItem,
+  categories: readonly Category[],
+): MenuItem[] {
   const rank = new Map(categories.map((category) => [category.id, category.sortOrder]))
-  return [...items].sort((a, b) => (rank.get(a.categoryId) ?? 0) - (rank.get(b.categoryId) ?? 0))
+  const old = items.find((item) => item.id === saved.id)
+  const next =
+    old?.categoryId === saved.categoryId
+      ? items.map((item) => (item.id === saved.id ? saved : item))
+      : [...items.filter((item) => item.id !== saved.id), saved]
+  return next.sort((a, b) => (rank.get(a.categoryId) ?? 0) - (rank.get(b.categoryId) ?? 0))
 }
 
 /**
@@ -28,15 +41,28 @@ export function useAdminMenu() {
   const loadedItems = useAsyncState((signal) => menuApi.listMenuItems({}, signal))
 
   /** The page's working copy of the dishes; what the server last sent, plus what was changed since. */
-  const items = ref<MenuItem[]>()
+  const working = ref<MenuItem[]>()
   const saving = reactive(new Set<string>())
 
-  // Side effect: a fresh load (first, or "Try again") replaces the working copy.
+  // Side effect: a fresh load (first, or "Try again") replaces the working copy, but not a change
+  // that is still on its way: its dish keeps the availability the user chose until it settles.
   watch(loadedItems.data, (fresh) => {
-    items.value = fresh
+    const current = working.value
+    working.value = fresh?.map((item) => {
+      const mine = saving.has(item.id) ? current?.find((c) => c.id === item.id) : undefined
+      return mine === undefined ? item : { ...item, available: mine.available }
+    })
   })
 
   const categories = computed(() => loadedCategories.data.value ?? [])
+
+  /**
+   * The dishes, once the categories are known too: a form opened before they arrived would start
+   * with no category to choose and never find out that they came.
+   */
+  const items = computed(() =>
+    loadedCategories.data.value === undefined ? undefined : working.value,
+  )
   const isLoading = computed(() => loadedItems.isLoading.value || loadedCategories.isLoading.value)
   const error = computed(() => loadedItems.error.value ?? loadedCategories.error.value)
 
@@ -45,23 +71,26 @@ export function useAdminMenu() {
     void loadedCategories.execute()
   }
 
-  function replaceItem(item: MenuItem): void {
-    items.value = (items.value ?? []).map((candidate) =>
-      candidate.id === item.id ? item : candidate,
+  /** Changes one field of one dish and leaves everything else as it is now. */
+  function patchItem(id: string, change: Partial<MenuItem>): void {
+    working.value = (working.value ?? []).map((candidate) =>
+      candidate.id === id ? { ...candidate, ...change } : candidate,
     )
   }
 
   async function setAvailable(id: string, available: boolean): Promise<void> {
-    const before = items.value?.find((item) => item.id === id)
+    const before = working.value?.find((item) => item.id === id)
     if (before === undefined || saving.has(id) || before.available === available) return
 
     saving.add(id)
-    replaceItem({ ...before, available })
+    patchItem(id, { available })
     try {
-      replaceItem(await adminApi.updateMenuItem(id, inputFromItem({ ...before, available })))
+      // Only `available` is touched when it settles (the server's answer is not written back), so
+      // nothing else changed in the meantime can be overwritten with an older copy.
+      await adminApi.updateMenuItem(id, inputFromItem({ ...before, available }))
       toasts.info(`${before.name} is now ${available ? 'available' : 'sold out'}.`)
     } catch (caught) {
-      replaceItem(before)
+      patchItem(id, { available: before.available })
       if (!(isApiError(caught) && caught.status === 401)) {
         const reason = isApiError(caught) ? caught.message : 'Something went wrong.'
         toasts.error(`${before.name} was not changed. ${reason}`)
@@ -73,13 +102,20 @@ export function useAdminMenu() {
 
   /** Creates a dish, or saves changes to `id`. Never throws: the outcome says what went wrong. */
   async function save(input: MenuItemInput, id?: string): Promise<SaveResult> {
+    // A change to this dish is on its way; saving over it now could send a state about to be undone.
+    if (id !== undefined && saving.has(id)) {
+      return {
+        ok: false,
+        fields: {},
+        general: ['This dish is being updated. Try again in a moment.'],
+      }
+    }
     try {
       const item =
         id === undefined
           ? await adminApi.createMenuItem(input)
           : await adminApi.updateMenuItem(id, input)
-      const others = (items.value ?? []).filter((candidate) => candidate.id !== item.id)
-      items.value = inCategoryOrder([...others, item], categories.value)
+      working.value = place(working.value ?? [], item, categories.value)
       return { ok: true, item }
     } catch (caught) {
       if (isApiError(caught) && caught.status === 422) {
@@ -97,7 +133,11 @@ export function useAdminMenu() {
 
   /** Deletes a dish; true when it is gone (including when it was already gone). */
   async function remove(id: string): Promise<boolean> {
-    const item = items.value?.find((candidate) => candidate.id === id)
+    const item = working.value?.find((candidate) => candidate.id === id)
+    if (saving.has(id)) {
+      toasts.error(`${item?.name ?? 'The dish'} is being updated. Try again in a moment.`)
+      return false
+    }
     try {
       await adminApi.deleteMenuItem(id)
     } catch (caught) {
@@ -110,7 +150,7 @@ export function useAdminMenu() {
         return false
       }
     }
-    items.value = (items.value ?? []).filter((candidate) => candidate.id !== id)
+    working.value = (working.value ?? []).filter((candidate) => candidate.id !== id)
     if (item !== undefined) toasts.info(`${item.name} was deleted.`)
     return true
   }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-const checked = defineModel<boolean>({ required: true })
-defineProps<{
+// Not a `v-model`: a switch like this one is only *asked* to change (its owner may refuse, or take a
+// moment to save), so it reports the wish with `toggle` and shows whatever `checked` says.
+const { checked } = defineProps<{
+  checked: boolean
   /** What the switch controls, for assistive technology: "Margherita pizza available". */
   label: string
   /** A change is being saved. The switch stays focusable and says it is busy. */
@@ -10,7 +12,7 @@ defineProps<{
 const emit = defineEmits<{ toggle: [next: boolean] }>()
 
 function toggle(): void {
-  emit('toggle', !checked.value)
+  emit('toggle', !checked)
 }
 </script>
 

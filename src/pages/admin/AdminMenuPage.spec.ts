@@ -102,7 +102,9 @@ describe('the menu page: the list', () => {
         .filter((item) => `${item.name} ${item.description}`.toLowerCase().includes('lasagna'))
         .map((item) => item.name),
     )
-    expect(router.currentRoute.value.query.q).toBe('lasagna')
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.query.q).toBe('lasagna')
+    })
 
     await wrapper.get('input[type="search"]').setValue('zzz nothing')
     await flushPromises()
@@ -113,7 +115,25 @@ describe('the menu page: the list', () => {
       ?.trigger('click')
     await flushPromises()
     expect(rowNames(wrapper)).toHaveLength(menuItems.length)
-    expect(router.currentRoute.value.query.q).toBeUndefined()
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.query.q).toBeUndefined()
+    })
+  })
+
+  it('keeps what is typed, a leading space included, and loses no letters when typing fast', async () => {
+    const { wrapper } = await mountMenu()
+    const box = () => wrapper.get<HTMLInputElement>('input[type="search"]')
+
+    await box().setValue(' ')
+    expect(box().element.value).toBe(' ')
+    await box().setValue(' l')
+    await box().setValue(' la')
+    await box().setValue(' las')
+    await new Promise((resolve) => setTimeout(resolve, 450)) // the URL catches up
+    await flushPromises()
+
+    expect(box().element.value).toBe(' las')
+    expect(rowNames(wrapper)).toContain('Lasagna')
   })
 
   it('opens already filtered from a link', async () => {
@@ -196,6 +216,35 @@ describe('the menu page: the availability switch', () => {
       expect(document.querySelector('.toast--error')?.textContent).toContain('Down')
     })
     expect(sw().attributes('aria-checked')).toBe('true')
+  })
+})
+
+describe('the menu page: a dish whose availability is being saved', () => {
+  it('cannot be edited or deleted until the save is over', async () => {
+    server.use(
+      mswHttp.put('/api/admin/menu-items/:id', async () => {
+        await delay(120)
+        return undefined
+      }),
+    )
+    const { wrapper } = await mountMenu()
+
+    await wrapper.get(`[aria-label="${dish.name} available"]`).trigger('click')
+    await wrapper.get(`[aria-label="Edit ${dish.name}"]`).trigger('click')
+    await wrapper.get(`[aria-label="Delete ${dish.name}"]`).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get(`[aria-label="Edit ${dish.name}"]`).attributes('aria-busy')).toBe('true')
+    expect(dialog(`Edit ${dish.name}`)).toBeUndefined()
+    expect(dialog(`Delete ${dish.name}?`)).toBeUndefined()
+
+    await vi.waitFor(() => {
+      expect(
+        wrapper.get(`[aria-label="Edit ${dish.name}"]`).attributes('aria-busy'),
+      ).toBeUndefined()
+    })
+    await openEditForm(wrapper, dish.name)
+    expect(dialog(`Edit ${dish.name}`)).toBeDefined()
   })
 })
 

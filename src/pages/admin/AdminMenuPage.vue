@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminMenuList from '@/components/admin/AdminMenuList.vue'
 import MenuItemForm from '@/components/admin/MenuItemForm.vue'
@@ -11,6 +11,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useAdminMenu } from '@/composables/useAdminMenu'
 import { useConfirm } from '@/composables/useConfirm'
+import { SEARCH_DEBOUNCE_MS } from '@/composables/useMenuFilters'
+import { useDebouncedRef } from '@/composables/useDebouncedRef'
 import { useUnsavedChangesGuard } from '@/composables/useUnsavedChangesGuard'
 import { useToastsStore } from '@/stores/toasts'
 import type { MenuItem } from '@/types/domain'
@@ -22,17 +24,25 @@ const toasts = useToastsStore()
 const confirm = useConfirm()
 
 // The search text lives in the URL, so a reload or a shared link keeps it. Filtering is done here,
-// on the dishes already loaded: it is instant and there is nothing to wait for.
-const search = computed({
-  get: () => {
-    const value = route.query.q
-    const first = Array.isArray(value) ? value[0] : value
-    return first ?? ''
-  },
-  set: (text) => {
-    const others = Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'q'))
-    void router.replace({ query: text.trim() === '' ? others : { ...others, q: text } })
-  },
+// on the dishes already loaded, straight from what is typed; the URL follows once the user pauses
+// (the same arrangement as the guest menu), so typing never waits for the router.
+const urlSearch = computed(() => {
+  const value = route.query.q
+  const first = Array.isArray(value) ? value[0] : value
+  return first ?? ''
+})
+const search = ref(urlSearch.value)
+const settledSearch = useDebouncedRef(search, SEARCH_DEBOUNCE_MS)
+
+// Typing -> URL. `replace`: a burst of searches must not fill the history.
+watch(settledSearch, (text) => {
+  const others = Object.fromEntries(Object.entries(route.query).filter(([key]) => key !== 'q'))
+  void router.replace({ query: text.trim() === '' ? others : { ...others, q: text.trim() } })
+})
+
+// URL -> input, for back/forward and shared links; what we wrote ourselves is skipped.
+watch(urlSearch, (value) => {
+  if (value !== settledSearch.value.trim()) search.value = value
 })
 
 const visible = computed(() => {

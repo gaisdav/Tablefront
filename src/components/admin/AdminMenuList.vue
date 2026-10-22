@@ -48,7 +48,7 @@ function categoryName(id: string): string {
         <td class="num">{{ formatCents(item.priceCents) }}</td>
         <td>
           <ToggleSwitch
-            :model-value="item.available"
+            :checked="item.available"
             :label="`${item.name} available`"
             :busy="saving.has(item.id)"
             @toggle="$emit('set-available', item, $event)"
@@ -58,6 +58,7 @@ function categoryName(id: string): string {
           <BaseButton
             variant="ghost"
             :aria-label="`Edit ${item.name}`"
+            :loading="saving.has(item.id)"
             @click="$emit('edit', item)"
           >
             Edit
@@ -65,6 +66,7 @@ function categoryName(id: string): string {
           <BaseButton
             variant="ghost"
             :aria-label="`Delete ${item.name}`"
+            :loading="saving.has(item.id)"
             @click="$emit('delete', item)"
           >
             Delete
@@ -84,7 +86,7 @@ function categoryName(id: string): string {
       <div class="card__foot">
         <span class="card__available">
           <ToggleSwitch
-            :model-value="item.available"
+            :checked="item.available"
             :label="`${item.name} available`"
             :busy="saving.has(item.id)"
             @toggle="$emit('set-available', item, $event)"
@@ -95,6 +97,7 @@ function categoryName(id: string): string {
           <BaseButton
             variant="ghost"
             :aria-label="`Edit ${item.name}`"
+            :loading="saving.has(item.id)"
             @click="$emit('edit', item)"
           >
             Edit
@@ -102,6 +105,7 @@ function categoryName(id: string): string {
           <BaseButton
             variant="ghost"
             :aria-label="`Delete ${item.name}`"
+            :loading="saving.has(item.id)"
             @click="$emit('delete', item)"
           >
             Delete

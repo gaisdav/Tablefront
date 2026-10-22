@@ -163,7 +163,48 @@ describe('MenuItemForm: validation', () => {
   })
 })
 
+describe('MenuItemForm: limits', () => {
+  it('stops typing at the length the API allows, for the name and the description', () => {
+    const { wrapper } = mountForm()
+
+    expect(field(wrapper, 'name').attributes('maxlength')).toBe('80')
+    expect(field(wrapper, 'description').attributes('maxlength')).toBe('500')
+    wrapper.unmount()
+  })
+
+  it('refuses a huge image address, and accepts the inline image an existing dish may have', async () => {
+    const { wrapper } = mountForm()
+    await fillValid(wrapper)
+    await field(wrapper, 'imageUrl').setValue(`https://example.test/${'a'.repeat(2000)}`)
+
+    await submit(wrapper)
+    expect(errors(wrapper)).toEqual(['Keep the address under 2000 characters'])
+
+    await field(wrapper, 'imageUrl').setValue('data:image/svg+xml,%3Csvg%2F%3E')
+    expect(errors(wrapper)).toEqual([])
+    wrapper.unmount()
+  })
+})
+
 describe('MenuItemForm: answers from the server', () => {
+  it('clears a server error on the allergens when they are changed', async () => {
+    const { wrapper } = mountForm({
+      save: () =>
+        Promise.resolve({ ok: false, fields: { allergens: 'Unknown allergen' }, general: [] }),
+    })
+    await fillValid(wrapper)
+    await submit(wrapper)
+    await flushPromises()
+    expect(wrapper.get('.allergens__error').text()).toBe('Unknown allergen')
+    expect(wrapper.get('fieldset').attributes('aria-invalid')).toBe('true')
+
+    await wrapper.findAll('input[type="checkbox"]')[1]?.setValue(true)
+
+    expect(wrapper.find('.allergens__error').exists()).toBe(false)
+    expect(wrapper.get('fieldset').attributes('aria-invalid')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('puts a field error on its input, focuses it, and lets the user fix and send again', async () => {
     let attempts = 0
     const { wrapper, save } = mountForm({

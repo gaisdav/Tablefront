@@ -19,6 +19,8 @@ export type MenuErrors = Partial<Record<MenuField, string>>
 // The same limits the API enforces, so the form catches the mistakes the server would.
 export const MAX_NAME_LENGTH = 80
 export const MAX_DESCRIPTION_LENGTH = 500
+/** Not an API limit: a guard against pasting something huge (an inline image can be long, a typed address is not). */
+export const MAX_IMAGE_URL_LENGTH = 2000
 
 export function emptyMenuForm(categories: readonly Category[]): MenuForm {
   return {
@@ -92,7 +94,9 @@ export function validateMenuForm(form: MenuForm, categories: readonly Category[]
   }
 
   const imageUrl = form.imageUrl.trim()
-  if (imageUrl !== '' && !isImageUrl(imageUrl)) {
+  if (imageUrl.length > MAX_IMAGE_URL_LENGTH) {
+    errors.imageUrl = `Keep the address under ${String(MAX_IMAGE_URL_LENGTH)} characters`
+  } else if (imageUrl !== '' && !isImageUrl(imageUrl)) {
     errors.imageUrl = 'Use an http(s) address, or leave it empty'
   }
   return errors

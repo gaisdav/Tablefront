@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
 
 function mountSwitch(modelValue: boolean, busy = false) {
-  return mount(ToggleSwitch, { props: { modelValue, label: 'Lasagna available', busy } })
+  return mount(ToggleSwitch, { props: { checked: modelValue, label: 'Lasagna available', busy } })
 }
 
 describe('ToggleSwitch', () => {

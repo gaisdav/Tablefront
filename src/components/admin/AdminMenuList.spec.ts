@@ -104,6 +104,20 @@ describe.each([
     ])
   })
 
+  it('marks Edit and Delete busy, and swallows presses, while the dish is being saved', async () => {
+    const wrapper = mountList(wide, ['item-8'])
+
+    await wrapper.get('[aria-label="Edit Lasagna"]').trigger('click')
+    await wrapper.get('[aria-label="Delete Lasagna"]').trigger('click')
+
+    expect(wrapper.get('[aria-label="Edit Lasagna"]').attributes('aria-busy')).toBe('true')
+    expect(
+      wrapper.get('[aria-label="Edit Margherita pizza"]').attributes('aria-busy'),
+    ).toBeUndefined()
+    expect(wrapper.emitted('edit')).toBeUndefined()
+    expect(wrapper.emitted('delete')).toBeUndefined()
+  })
+
   it('has Edit and Delete named after the dish, which emit the dish', async () => {
     const wrapper = mountList(wide)
 

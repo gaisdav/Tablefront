@@ -9,6 +9,7 @@ import {
   emptyMenuForm,
   formFromItem,
   MAX_DESCRIPTION_LENGTH,
+  MAX_IMAGE_URL_LENGTH,
   MAX_NAME_LENGTH,
   sameForm,
   toMenuItemInput,
@@ -76,6 +77,14 @@ for (const field of ['name', 'description', 'price', 'categoryId', 'imageUrl'] a
   )
 }
 
+// A server error on the allergens goes away as soon as the user changes them.
+watch(
+  () => form.allergens,
+  () => {
+    recheck('allergens')
+  },
+)
+
 function toggleAllergen(allergen: Allergen, on: boolean): void {
   form.allergens = on
     ? [...form.allergens, allergen]
@@ -130,7 +139,7 @@ async function submit(): Promise<void> {
       label="Name"
       name="name"
       autocomplete="off"
-      :maxlength="MAX_NAME_LENGTH + 20"
+      :maxlength="MAX_NAME_LENGTH"
       :error="errors.name"
     />
     <BaseInput
@@ -138,6 +147,7 @@ async function submit(): Promise<void> {
       label="Description"
       name="description"
       multiline
+      :maxlength="MAX_DESCRIPTION_LENGTH"
       :hint="`Up to ${String(MAX_DESCRIPTION_LENGTH)} characters.`"
       :error="errors.description"
     />
@@ -165,6 +175,7 @@ async function submit(): Promise<void> {
       name="imageUrl"
       type="url"
       autocomplete="off"
+      :maxlength="MAX_IMAGE_URL_LENGTH"
       hint="Optional. An http(s) address."
       :error="errors.imageUrl"
     />
