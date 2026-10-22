@@ -1,6 +1,6 @@
 import { isRecord } from '@/domain/guards'
 
-const STORAGE_KEY = 'tablefront:orders'
+export const STORAGE_KEY = 'tablefront:orders'
 
 /** Bump when the shape of the saved list changes; a list saved under another version is dropped. */
 const SCHEMA_VERSION = 1

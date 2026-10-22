@@ -59,6 +59,61 @@ describe('the remembered orders', () => {
   })
 })
 
+describe('several tabs', () => {
+  it('does not erase an order another tab placed when this tab saves', async () => {
+    const tabA = store()
+    const tabB = store() // a second tab: its own memory, the same storage
+    tabB.remember('ord-b')
+    await nextTick() // saved
+
+    tabA.remember('ord-c')
+
+    expect(tabA.ids).toEqual(['ord-c', 'ord-b'])
+  })
+
+  it('does not bring back or lose anything when forgetting in one tab', async () => {
+    const tabA = store()
+    const tabB = store()
+    tabB.remember('ord-b')
+    await nextTick()
+
+    tabA.remember('ord-a')
+    tabA.forget('ord-b')
+
+    expect(tabA.ids).toEqual(['ord-a'])
+  })
+
+  it('picks up a change made in another tab without a reload', async () => {
+    const tabA = store()
+    localStorage.setItem(KEY, JSON.stringify({ version: 1, ids: ['ord-b'] }))
+
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
+    await nextTick()
+
+    expect(tabA.ids).toEqual(['ord-b'])
+  })
+
+  it('ignores changes to other keys', () => {
+    const tabA = store()
+    tabA.remember('ord-a')
+    localStorage.setItem('unrelated', 'x')
+
+    window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated' }))
+
+    expect(tabA.ids).toEqual(['ord-a'])
+  })
+
+  it('stops listening when the store is disposed', () => {
+    const tabA = store()
+    tabA.$dispose()
+    localStorage.setItem(KEY, JSON.stringify({ version: 1, ids: ['ord-b'] }))
+
+    window.dispatchEvent(new StorageEvent('storage', { key: KEY }))
+
+    expect(tabA.ids).toEqual([])
+  })
+})
+
 describe('persistence', () => {
   it('saves under a versioned key whenever the list changes', async () => {
     const orders = store()

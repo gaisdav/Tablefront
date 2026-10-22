@@ -107,6 +107,27 @@ describe('My orders', () => {
     expect(localStorage.getItem('tablefront:orders')).not.toContain('ord-gone')
   })
 
+  it('keeps an order that could not be loaded among those in progress, without Remove', async () => {
+    const [good, flaky] = [place('preparing'), place('preparing')]
+    remember(flaky.id, good.id)
+    server.use(
+      mswHttp.get('/api/orders/:id', ({ params }) =>
+        params.id === flaky.id
+          ? HttpResponse.json({ error: { code: 'server_error', message: 'Down' } }, { status: 500 })
+          : undefined,
+      ),
+    )
+    const { wrapper } = await mountAppAt('/orders')
+    await vi.waitFor(() => {
+      expect(wrapper.find('.gone').exists()).toBe(true)
+    })
+
+    expect(sectionHeadings(wrapper)).toEqual(['In progress'])
+    expect(wrapper.get('.gone').text()).toContain('could not be loaded right now')
+    expect(wrapper.get('.gone a').attributes('href')).toBe(`/orders/${flaky.id}`)
+    expect(wrapper.find('.gone button').exists()).toBe(false)
+  })
+
   it('shows the error with a way to retry when nothing can be loaded', async () => {
     const order = place()
     remember(order.id)
@@ -155,10 +176,18 @@ describe('getting to My orders', () => {
     expect(router.currentRoute.value.name).toBe('menu')
   })
 
-  it('links back from an order page', async () => {
+  it('links back from an order page to someone who has orders', async () => {
     const order = place()
+    remember(order.id)
     const { wrapper } = await mountAppAt(`/orders/${order.id}`)
 
     expect(wrapper.get('a.back').attributes('href')).toBe('/orders')
+  })
+
+  it('offers no way back to someone who followed a shared link and has no orders', async () => {
+    const order = place()
+    const { wrapper } = await mountAppAt(`/orders/${order.id}`)
+
+    expect(wrapper.find('a.back').exists()).toBe(false)
   })
 })

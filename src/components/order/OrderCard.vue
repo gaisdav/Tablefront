@@ -5,7 +5,11 @@ import { formatCents } from '@/domain/money'
 import { formatPlacedAt, summarizeLines } from '@/domain/orderPresentation'
 import type { Order } from '@/types/domain'
 
-defineProps<{ order: Order }>()
+defineProps<{
+  order: Order
+  /** The last refresh of this order failed; the status shown may be behind. */
+  stale?: boolean
+}>()
 </script>
 
 <template>
@@ -19,6 +23,9 @@ defineProps<{ order: Order }>()
       </h3>
       <OrderStatusBadge :status="order.status" />
     </div>
+    <p v-if="stale" class="card__stale">
+      Could not refresh this order; its status may be out of date.
+    </p>
     <p class="card__items">{{ summarizeLines(order.lines) }}</p>
     <p class="card__meta text-muted">
       <time :datetime="order.createdAt">{{ formatPlacedAt(order.createdAt) }}</time>
@@ -78,6 +85,11 @@ defineProps<{ order: Order }>()
 
 .card__link:focus-visible {
   outline: none;
+}
+
+.card__stale {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
 }
 
 .card__items {

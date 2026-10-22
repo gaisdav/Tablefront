@@ -1,3 +1,4 @@
+import { watch } from 'vue'
 import { isApiError } from '@/api/errors'
 import { ordersApi } from '@/api/ordersApi'
 import { usePolling, type Polling } from '@/composables/usePolling'
@@ -6,7 +7,8 @@ import type { Order } from '@/types/domain'
 
 /** What the page knows about one remembered order. */
 export type OrderEntry =
-  | { id: string; kind: 'order'; order: Order }
+  /** `stale`: the last refresh of this one failed, so this is what was last known. */
+  | { id: string; kind: 'order'; order: Order; stale?: boolean }
   /** The server says there is no such order (the mock backend restarted, or the id was made up). */
   | { id: string; kind: 'missing' }
   /** This one could not be loaded right now, while others could. */
@@ -34,7 +36,7 @@ export function useMyOrders(
   const settled = new Map<string, OrderEntry>()
   const latest = new Map<string, OrderEntry>()
 
-  return usePolling(
+  const polling = usePolling(
     async (signal) => {
       const failures: unknown[] = []
       let attempted = 0
@@ -55,13 +57,16 @@ export function useMyOrders(
             if (isSettled(entry)) settled.set(id, entry)
             return entry
           } catch (error) {
+            // Cancelled (the page went away, or a newer refresh replaced this one): not a failure.
+            if (signal.aborted) throw error
             if (isApiError(error) && error.status === 404) {
               const entry: OrderEntry = { id, kind: 'missing' }
               settled.set(id, entry)
               return entry
             }
             failures.push(error)
-            return latest.get(id) ?? { id, kind: 'unavailable' }
+            const last = latest.get(id)
+            return last?.kind === 'order' ? { ...last, stale: true } : { id, kind: 'unavailable' }
           }
         }),
       )
@@ -74,4 +79,18 @@ export function useMyOrders(
     },
     { intervalMs, shouldStop: (entries) => entries.every(isSettled) },
   )
+
+  // The list can change while the page is open (another tab placed an order, one was forgotten).
+  watch(
+    () => [...ids()],
+    (now, before) => {
+      for (const known of [settled, latest]) {
+        for (const id of known.keys()) if (!now.includes(id)) known.delete(id)
+      }
+      // A newcomer must be asked about, even if polling had already ended.
+      if (now.some((id) => !before.includes(id))) polling.refresh()
+    },
+  )
+
+  return polling
 }

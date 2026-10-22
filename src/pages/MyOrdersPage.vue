@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AsyncBoundary from '@/components/AsyncBoundary.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -27,16 +27,17 @@ const entries = computed<OrderEntry[] | undefined>(() => {
 const blockingError = computed(() => (entries.value === undefined ? polling.error.value : null))
 const refreshFailed = computed(() => entries.value !== undefined && polling.error.value !== null)
 
+// Still changing, or not known: an order that could not be loaded may well be in progress, so it
+// stays up here and cannot be removed (that would lose the only link to it).
 function isActive(entry: OrderEntry): boolean {
-  return entry.kind === 'order' && !isTerminalStatus(entry.order.status)
+  return (
+    entry.kind === 'unavailable' ||
+    (entry.kind === 'order' && !isTerminalStatus(entry.order.status))
+  )
 }
 
 // Orders that can still change come first: that is what someone opening this page is after.
-const active = computed(() =>
-  (entries.value ?? []).flatMap((entry) =>
-    isActive(entry) && entry.kind === 'order' ? [entry.order] : [],
-  ),
-)
+const active = computed(() => (entries.value ?? []).filter(isActive))
 const past = computed(() => (entries.value ?? []).filter((entry) => !isActive(entry)))
 </script>
 
@@ -75,8 +76,19 @@ const past = computed(() => (entries.value ?? []).filter((entry) => !isActive(en
           <section v-if="active.length > 0" class="group" aria-labelledby="active-heading">
             <h2 id="active-heading">In progress</h2>
             <ul class="list" role="list">
-              <li v-for="order in active" :key="order.id">
-                <OrderCard :order="order" />
+              <li v-for="entry in active" :key="entry.id">
+                <OrderCard
+                  v-if="entry.kind === 'order'"
+                  :order="entry.order"
+                  :stale="entry.stale"
+                />
+                <div v-else class="gone">
+                  <p>
+                    <strong>Order {{ entry.id }}</strong>
+                    could not be loaded right now.
+                  </p>
+                  <RouterLink :to="{ name: 'order', params: { id: entry.id } }">Open</RouterLink>
+                </div>
               </li>
             </ul>
           </section>
@@ -86,11 +98,10 @@ const past = computed(() => (entries.value ?? []).filter((entry) => !isActive(en
             <ul class="list" role="list">
               <li v-for="entry in past" :key="entry.id">
                 <OrderCard v-if="entry.kind === 'order'" :order="entry.order" />
-                <div v-else class="gone">
+                <div v-else-if="entry.kind === 'missing'" class="gone">
                   <p>
                     <strong>Order {{ entry.id }}</strong>
-                    <span v-if="entry.kind === 'missing'"> no longer exists on the server. </span>
-                    <span v-else>could not be loaded right now.</span>
+                    no longer exists on the server.
                   </p>
                   <BaseButton
                     variant="ghost"
