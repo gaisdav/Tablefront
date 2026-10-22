@@ -70,6 +70,19 @@ export default defineConfig([
         'error',
         { name: 'fetch', message: 'Call the API through the modules in src/api.' },
       ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'fetch',
+          message: 'Call the API through the modules in src/api.',
+        },
+        {
+          object: 'globalThis',
+          property: 'fetch',
+          message: 'Call the API through the modules in src/api.',
+        },
+      ],
     },
   },
 
