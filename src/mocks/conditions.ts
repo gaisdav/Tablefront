@@ -44,8 +44,10 @@ export function resetMockConditions(): void {
 }
 
 /**
- * Runs before every handler. Returns the response that should replace the real one
- * (network error or 500), or null when the request should proceed normally.
+ * Runs before every handler, ahead of the auth check: a dropped connection or a failing gateway
+ * hits an unauthenticated request just as it hits an authenticated one.
+ * Returns the response that should replace the real one (network error or 500), or null when
+ * the request should proceed normally.
  */
 export async function applyConditions(): Promise<Response | null> {
   if (conditions.offline) return HttpResponse.error()
@@ -53,7 +55,9 @@ export async function applyConditions(): Promise<Response | null> {
   const [min, max] = LATENCY_RANGES_MS[conditions.latency]
   if (max > 0) await delay(min + Math.random() * (max - min))
 
-  if (Math.random() < ERROR_PROBABILITY[conditions.errorRate]) {
+  const errorProbability = ERROR_PROBABILITY[conditions.errorRate]
+  // Only roll when the outcome is actually random.
+  if (errorProbability >= 1 || (errorProbability > 0 && Math.random() < errorProbability)) {
     const body: ApiErrorBody = {
       error: { code: 'server_error', message: 'Simulated server error. Please try again.' },
     }

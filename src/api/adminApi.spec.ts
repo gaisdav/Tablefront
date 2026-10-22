@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { adminApi } from '@/api/adminApi'
 import { isApiError } from '@/api/errors'
 import { menuApi } from '@/api/menuApi'
+import { ordersApi } from '@/api/ordersApi'
 import { rejection, signInAsAdmin, signOut } from '@/test/helpers'
-import type { MenuItemInput } from '@/types/api'
+import type { CreateOrderRequest, MenuItemInput } from '@/types/api'
 
 const newItem: MenuItemInput = {
   name: 'Caprese salad',
@@ -13,6 +14,12 @@ const newItem: MenuItemInput = {
   imageUrl: null,
   available: true,
   allergens: ['dairy'],
+}
+
+const order: CreateOrderRequest = {
+  lines: [{ menuItemId: 'item-5', quantity: 1 }],
+  fulfillment: 'pickup',
+  customer: { name: 'Eva Braun', phone: '+49 30 9876543' },
 }
 
 describe('adminApi without a session', () => {
@@ -44,6 +51,20 @@ describe('adminApi orders', () => {
       'ord-1002',
       'ord-1001',
     ])
+  })
+
+  it('puts the later order first when two are created in the same millisecond', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const first = await ordersApi.createOrder(order)
+      const second = await ordersApi.createOrder(order)
+
+      const orders = await adminApi.listOrders()
+
+      expect(orders.slice(0, 2).map((item) => item.id)).toEqual([second.id, first.id])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('filters by status', async () => {
@@ -94,8 +115,36 @@ describe('adminApi menu items', () => {
     expect(guestItems).toEqual([created])
   })
 
-  it('treats an empty image as no image', async () => {
-    const created = await adminApi.createMenuItem({ ...newItem, imageUrl: '' })
+  it.each([
+    ['plain text', 'not a url'],
+    ['a javascript: URL', 'javascript:alert(1)'],
+    ['a relative path', '/images/dish.png'],
+    ['a non-image data URL', 'data:text/html,<script>alert(1)</script>'],
+  ])('rejects %s as an image', async (_label, imageUrl) => {
+    const error = await rejection(adminApi.createMenuItem({ ...newItem, imageUrl }))
+
+    expect(error).toMatchObject({
+      status: 422,
+      fieldErrors: { imageUrl: 'Image must be an http(s) URL or empty' },
+    })
+  })
+
+  it('accepts http(s) and image data URLs, and trims them', async () => {
+    const remote = await adminApi.createMenuItem({
+      ...newItem,
+      imageUrl: '  https://example.test/dish.jpg ',
+    })
+    const inline = await adminApi.createMenuItem({
+      ...newItem,
+      imageUrl: 'data:image/svg+xml,%3Csvg%2F%3E',
+    })
+
+    expect(remote.imageUrl).toBe('https://example.test/dish.jpg')
+    expect(inline.imageUrl).toBe('data:image/svg+xml,%3Csvg%2F%3E')
+  })
+
+  it('treats a blank image as no image', async () => {
+    const created = await adminApi.createMenuItem({ ...newItem, imageUrl: '   ' })
 
     expect(created.imageUrl).toBeNull()
   })

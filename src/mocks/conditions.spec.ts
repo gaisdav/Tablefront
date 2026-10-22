@@ -47,6 +47,18 @@ describe('mock conditions', () => {
     await expect(menuApi.listCategories()).resolves.toHaveLength(4)
   })
 
+  it('does not roll the dice when the outcome is not random', async () => {
+    const random = vi.spyOn(Math, 'random')
+
+    // Called directly: the HTTP stack itself uses Math.random for request ids.
+    setMockConditions({ errorRate: 'off' })
+    expect(await applyConditions()).toBeNull()
+    setMockConditions({ errorRate: 'always' })
+    expect((await applyConditions())?.status).toBe(500)
+
+    expect(random).not.toHaveBeenCalled()
+  })
+
   it('recovers when conditions are switched back', async () => {
     setMockConditions({ offline: true })
     await rejection(menuApi.listCategories())
@@ -88,9 +100,9 @@ describe('mock latency', () => {
     random.mockReturnValue(0)
     expect(await elapsed()).toBe(min)
 
-    vi.useRealTimers()
     random.mockReturnValue(0.999)
-    expect(await elapsed()).toBeGreaterThanOrEqual(max - 10)
-    expect(await elapsed()).toBeLessThanOrEqual(max)
+    const slowest = await elapsed()
+    expect(slowest).toBeGreaterThanOrEqual(max - 10)
+    expect(slowest).toBeLessThanOrEqual(max)
   })
 })

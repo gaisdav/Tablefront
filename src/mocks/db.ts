@@ -91,10 +91,11 @@ export const db = {
     return state.orders.find((order) => order.id === id)
   },
 
-  /** Newest first. */
+  /** Newest first. Orders created in the same millisecond keep the later one first. */
   listOrders(status?: OrderStatus): Order[] {
     return state.orders
       .filter((order) => status === undefined || order.status === status)
+      .reverse()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   },
 
