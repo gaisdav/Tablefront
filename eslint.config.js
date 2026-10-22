@@ -62,6 +62,18 @@ export default defineConfig([
   },
 
   {
+    // The spec allows `fetch` only inside the API layer.
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/api/**'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: 'Call the API through the modules in src/api.' },
+      ],
+    },
+  },
+
+  {
     // Config files live outside the app tsconfig, so they get no type-aware linting.
     files: ['*.config.{js,ts}'],
     extends: [tseslint.configs.disableTypeChecked],
