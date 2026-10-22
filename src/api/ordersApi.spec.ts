@@ -73,6 +73,16 @@ describe('ordersApi.createOrder', () => {
     expect(pickup.customer).toEqual(customer)
   })
 
+  it('rejects a phone number made only of separators', async () => {
+    const fields = await fieldErrorsFor({
+      lines: [{ menuItemId: 'item-5', quantity: 1 }],
+      fulfillment: 'pickup',
+      customer: { name: 'Anna', phone: '-------' },
+    })
+
+    expect(fields).toEqual({ 'customer.phone': 'Phone number looks invalid' })
+  })
+
   it('reports an error per invalid field', async () => {
     const fields = await fieldErrorsFor({
       lines: [],

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { allowedTransitions, canTransition } from '@/domain/orderStatus'
+import {
+  allowedTransitions,
+  canTransition,
+  isTerminalStatus,
+  PROGRESS_STEPS,
+  statusLabel,
+} from '@/domain/orderStatus'
 import type { OrderStatus } from '@/types/domain'
 
 const ALL: OrderStatus[] = ['new', 'preparing', 'ready', 'completed', 'cancelled']
@@ -43,5 +49,25 @@ describe('order status transitions', () => {
       const accepted = ALL.filter((to) => canTransition(from, to))
       expect(allowedTransitions(from)).toEqual(accepted)
     }
+  })
+})
+
+describe('order status presentation', () => {
+  it('treats exactly the statuses with no way forward as terminal', () => {
+    expect(ALL.filter(isTerminalStatus)).toEqual(['completed', 'cancelled'])
+  })
+
+  it('has a label for every status', () => {
+    expect(ALL.map(statusLabel)).toEqual([
+      'Received',
+      'Preparing',
+      'Ready',
+      'Completed',
+      'Cancelled',
+    ])
+  })
+
+  it('shows the happy path as the steps, without cancelled', () => {
+    expect(PROGRESS_STEPS).toEqual(['new', 'preparing', 'ready', 'completed'])
   })
 })
