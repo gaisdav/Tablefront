@@ -12,7 +12,13 @@ test.describe('browsing the menu', () => {
 
     await page.getByRole('radio', { name: 'Desserts' }).check()
     await expect(page).toHaveURL(/category=/)
-    await expect(dishes).not.toHaveCount(18) // the new results have replaced the old ones
+    // Wait for the filtered list itself: not the old 18, and not an empty moment in between.
+    await expect
+      .poll(async () => {
+        const shown = await dishes.count()
+        return shown > 0 && shown < 18
+      })
+      .toBe(true)
     const desserts = await dishes.count()
     expect(desserts).toBeGreaterThan(0)
     expect(desserts).toBeLessThan(18)

@@ -63,8 +63,8 @@ test.describe('the orders board', () => {
     await signIn(page)
     const order = page.getByRole('button', { name: /ord-1007/ })
     await expect(order).toContainText('Received')
-    await order.click()
     await devTools.configure({ errors: 'Always' })
+    await order.click()
 
     await page.getByRole('button', { name: 'Start preparing' }).click()
 

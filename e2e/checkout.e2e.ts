@@ -86,5 +86,6 @@ test.describe('checkout', () => {
     const heading = page.getByRole('heading', { level: 1 })
     await expect(heading).toHaveText('Preparing', { timeout: 20_000 })
     await expect(page.getByText('Order status: Preparing.')).toBeAttached()
+    await staff.close()
   })
 })

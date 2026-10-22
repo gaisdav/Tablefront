@@ -29,7 +29,9 @@ export default defineConfig({
     command: `pnpm build && pnpm preview --port ${String(PORT)} --strictPort`,
     env: { VITE_ENABLE_MOCKS: 'true' },
     url: `http://localhost:${String(PORT)}`,
-    reuseExistingServer: !inCi,
+    // Never reuse a server that is already there: it could be an old build, or one without the
+    // mock API. With the port taken the run fails (strictPort) instead of testing the wrong thing.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })

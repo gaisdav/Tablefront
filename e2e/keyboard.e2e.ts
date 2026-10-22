@@ -8,12 +8,24 @@ async function focusedName(page: Page): Promise<string> {
     if (element === null) return ''
     const label = element.getAttribute('aria-label')
     if (label !== null) return label
-    if (element instanceof HTMLInputElement) {
-      const labels: NodeListOf<HTMLLabelElement> | null = element.labels
-      return labels === null ? '' : labels.item(0).textContent.trim()
+    if (element.id !== '') {
+      const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`)
+      if (label !== null) return label.textContent.trim()
     }
+    const wrapping = element.closest('label')
+    if (wrapping !== null) return wrapping.textContent.trim()
     return element.textContent.trim()
   })
+}
+
+/** The focused element shows where the focus is: an outline or a ring drawn with a shadow. */
+async function expectVisibleFocus(page: Page) {
+  const drawn = await page.evaluate(() => {
+    const style = getComputedStyle(document.activeElement ?? document.body)
+    const outline = style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0
+    return outline || style.boxShadow !== 'none'
+  })
+  expect(drawn, `no visible focus on "${await focusedName(page)}"`).toBe(true)
 }
 
 /** Presses Tab (or Shift+Tab) until the focus lands on `name`; fails if it never does. */
@@ -21,7 +33,10 @@ async function tabTo(page: Page, name: string | RegExp, direction: 'forward' | '
   for (let presses = 0; presses < 80; presses += 1) {
     await page.keyboard.press(direction === 'forward' ? 'Tab' : 'Shift+Tab')
     const current = await focusedName(page)
-    if (typeof name === 'string' ? current === name : name.test(current)) return
+    if (typeof name === 'string' ? current === name : name.test(current)) {
+      await expectVisibleFocus(page)
+      return
+    }
   }
   throw new Error(`Focus never reached ${String(name)} by keyboard`)
 }
@@ -35,10 +50,6 @@ test.describe('keyboard only', () => {
 
     // Pick a dish.
     await tabTo(page, 'Add Bruschetta to cart')
-    const outline = await page.evaluate(
-      () => getComputedStyle(document.activeElement ?? document.body).outlineStyle,
-    )
-    expect(outline).not.toBe('none')
     await page.keyboard.press('Enter')
     await expect(page.getByRole('group', { name: 'Quantity of Bruschetta' })).toBeVisible()
     await expect(

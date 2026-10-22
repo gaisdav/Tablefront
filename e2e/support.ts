@@ -21,7 +21,8 @@ export class DevTools {
     if (settings.offline !== undefined) {
       await panel.getByRole('checkbox', { name: /Offline/ }).setChecked(settings.offline)
     }
-    await this.page.keyboard.press('Escape')
+    // Closed with its own button, not Escape: Escape would also reach whatever else is open.
+    await this.toggle.click()
     await expect(panel).toBeHidden()
   }
 }
@@ -37,12 +38,15 @@ export const test = base.extend<{ devTools: DevTools }>({
   },
   page: async ({ page }, use) => {
     // Anything the app logs as an error or warning, or any uncaught exception, fails the test.
-    // The browser's own note about a failed request is expected when a test forces a failure.
+    // The browser's own note about a failed request is expected when a test forces a failure of
+    // the mock API (`/api/...`); a failed file (a script, a font, the service worker) is not.
     const problems: string[] = []
     page.on('console', (message) => {
       if (!['error', 'warning'].includes(message.type())) return
-      if (message.text().startsWith('Failed to load resource')) return
-      problems.push(`console ${message.type()}: ${message.text()}`)
+      const forcedApiFailure =
+        message.text().startsWith('Failed to load resource') &&
+        new URL(message.location().url || 'about:blank').pathname.startsWith('/api/')
+      if (!forcedApiFailure) problems.push(`console ${message.type()}: ${message.text()}`)
     })
     page.on('pageerror', (error) => {
       problems.push(`uncaught: ${error.message}`)
