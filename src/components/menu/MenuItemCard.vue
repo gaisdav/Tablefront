@@ -1,15 +1,40 @@
 <script setup lang="ts">
+import { nextTick, useTemplateRef, watch } from 'vue'
 import BaseButton from '@/components/BaseButton.vue'
+import QuantityStepper from '@/components/cart/QuantityStepper.vue'
 import { formatCents } from '@/domain/money'
 import type { MenuItem } from '@/types/domain'
 
-defineProps<{
+const { item, quantityInCart = 0 } = defineProps<{
   item: MenuItem
   /** How many of this dish are in the cart already. */
   quantityInCart?: number
 }>()
 
-defineEmits<{ add: [item: MenuItem] }>()
+const emit = defineEmits<{
+  add: [item: MenuItem]
+  /** The new quantity from the stepper; 0 means "remove it". */
+  'change-quantity': [item: MenuItem, quantity: number]
+}>()
+
+// "Add" turns into the stepper and back, so the button the user just pressed disappears. If focus
+// was on it, it goes to where the same finger or key would carry on: the + after adding, "Add"
+// after removing. Focus elsewhere (the drawer, another card) is never taken, so the cart changing
+// from somewhere else cannot steal it, and no timing between click and render is involved.
+const actions = useTemplateRef<HTMLElement>('actions')
+const stepper = useTemplateRef<InstanceType<typeof QuantityStepper>>('stepper')
+
+// A `pre` watcher runs before the DOM is patched, so the old control is still there to ask.
+watch(
+  () => quantityInCart > 0,
+  async (hasSome) => {
+    const hadFocus = actions.value?.contains(document.activeElement) ?? false
+    if (!hadFocus) return
+    await nextTick()
+    if (hasSome) stepper.value?.focusIncrease()
+    else actions.value?.querySelector<HTMLElement>('[data-add]')?.focus()
+  },
+)
 </script>
 
 <template>
@@ -35,24 +60,38 @@ defineEmits<{ add: [item: MenuItem] }>()
         <p class="card__price">{{ formatCents(item.priceCents) }}</p>
       </div>
       <p class="card__description">{{ item.description }}</p>
-      <ul
-        v-if="item.allergens.length > 0"
-        class="card__allergens"
-        aria-label="Allergens"
-        role="list"
-      >
-        <li v-for="allergen in item.allergens" :key="allergen" class="badge">{{ allergen }}</li>
-      </ul>
-      <p v-if="!item.available" class="card__status">Sold out</p>
-      <div v-else class="card__actions">
-        <BaseButton
-          variant="secondary"
-          :aria-label="`Add ${item.name} to cart`"
-          @click="$emit('add', item)"
+      <!-- The footer sits at the bottom of the card whatever else is (or is not) above it. -->
+      <div class="card__footer">
+        <ul
+          v-if="item.allergens.length > 0"
+          class="card__allergens"
+          aria-label="Allergens"
+          role="list"
         >
-          Add
-        </BaseButton>
-        <p v-if="quantityInCart" class="card__in-cart">{{ quantityInCart }} in cart</p>
+          <li v-for="allergen in item.allergens" :key="allergen" class="badge">{{ allergen }}</li>
+        </ul>
+        <p v-if="!item.available" class="card__status">Sold out</p>
+        <div v-else ref="actions" class="card__actions">
+          <!-- Same height either way, so the card does not jump when one turns into the other. -->
+          <QuantityStepper
+            v-if="quantityInCart > 0"
+            ref="stepper"
+            :model-value="quantityInCart"
+            :label="item.name"
+            removable
+            silent
+            @update:model-value="emit('change-quantity', item, $event)"
+          />
+          <BaseButton
+            v-else
+            data-add
+            variant="secondary"
+            :aria-label="`Add ${item.name} to cart`"
+            @click="emit('add', item)"
+          >
+            Add
+          </BaseButton>
+        </div>
       </div>
     </div>
   </article>
@@ -138,11 +177,17 @@ defineEmits<{ add: [item: MenuItem] }>()
   -webkit-box-orient: vertical;
 }
 
+.card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
 .card__allergens {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-  margin-top: auto;
   padding: 0;
   list-style: none;
 }
@@ -159,13 +204,7 @@ defineEmits<{ add: [item: MenuItem] }>()
 .card__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-}
-
-.card__in-cart {
-  color: var(--color-accent-text);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  min-height: var(--tap-size);
 }
 
 .card__status {
@@ -177,7 +216,7 @@ defineEmits<{ add: [item: MenuItem] }>()
 @media (min-width: 48rem) {
   .card {
     grid-template-columns: 1fr;
-    align-content: start;
+    grid-template-rows: auto 1fr;
     padding: 0 0 var(--space-4);
     overflow: hidden;
   }

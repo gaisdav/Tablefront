@@ -1,4 +1,4 @@
-import { type VueWrapper } from '@vue/test-utils'
+import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { http as mswHttp, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { menuItems } from '@/mocks/fixtures'
@@ -72,10 +72,11 @@ describe('cart from the menu', () => {
 
     expect(cart.quantityOf('item-5')).toBe(1)
     expect(cartButton(wrapper).attributes('aria-label')).toBe('Cart, 1 item')
-    expect(wrapper.text()).toContain('1 in cart')
+    expect(wrapper.find('[aria-label="Add Margherita pizza to cart"]').exists()).toBe(false)
+    expect(wrapper.get('.card [role="group"] .stepper__value').text()).toBe('1')
     expect(announcement(wrapper)).toBe('Added Margherita pizza. Cart total €11.00.')
 
-    await wrapper.get('[aria-label="Add Margherita pizza to cart"]').trigger('click')
+    await wrapper.get('[aria-label="Increase quantity"]').trigger('click')
 
     expect(cartButton(wrapper).attributes('aria-label')).toBe('Cart, 2 items')
     expect(announcement(wrapper)).toBe('Margherita pizza: 2 in cart. Cart total €22.00.')
@@ -113,6 +114,31 @@ describe('cart from the menu', () => {
     observer.disconnect()
 
     expect(seen).toContain('')
+  })
+
+  it('turns Add into a stepper that adds, removes and goes back to Add', async () => {
+    const { wrapper, cart } = await mountAppAt('/')
+    await untilMenuLoaded(wrapper)
+    const card = () => wrapper.findAll('.card').find((c) => c.text().includes('Margherita pizza'))
+    // A real click focuses the button; jsdom's synthetic one does not.
+    wrapper.get<HTMLElement>('[aria-label="Add Margherita pizza to cart"]').element.focus()
+    await wrapper.get('[aria-label="Add Margherita pizza to cart"]').trigger('click')
+    await flushPromises()
+    // The button that was pressed is gone; focus carries on at the +.
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Increase quantity')
+
+    await card()?.get('[aria-label="Increase quantity"]').trigger('click')
+    expect(cart.quantityOf('item-5')).toBe(2)
+    await card()?.get('[aria-label="Decrease quantity"]').trigger('click')
+    expect(cart.quantityOf('item-5')).toBe(1)
+    card()?.get<HTMLElement>('[aria-label="Remove Margherita pizza from cart"]').element.focus()
+    await card()?.get('[aria-label="Remove Margherita pizza from cart"]').trigger('click')
+
+    await flushPromises()
+    expect(cart.isEmpty).toBe(true)
+    expect(wrapper.find('[aria-label="Add Margherita pizza to cart"]').exists()).toBe(true)
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Add Margherita pizza to cart')
+    expect(announcement(wrapper)).toBe('Removed Margherita pizza. Your cart is empty.')
   })
 
   it('offers no add button for a sold-out dish', async () => {

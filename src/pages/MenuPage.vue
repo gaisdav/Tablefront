@@ -160,6 +160,7 @@ const emptyTitle = computed(() => {
                 :item="item"
                 :quantity-in-cart="cart.quantityOf(item.id)"
                 @add="cart.add($event)"
+                @change-quantity="(dish, quantity) => cart.setQuantity(dish.id, quantity)"
               />
             </li>
           </ul>

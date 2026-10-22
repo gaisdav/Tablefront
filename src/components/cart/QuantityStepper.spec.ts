@@ -2,7 +2,10 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import QuantityStepper from '@/components/cart/QuantityStepper.vue'
 
-function mountStepper(modelValue: number, props: { min?: number; max?: number } = {}) {
+function mountStepper(
+  modelValue: number,
+  props: { min?: number; max?: number; removable?: boolean; silent?: boolean } = {},
+) {
   return mount(QuantityStepper, { props: { modelValue, label: 'Margherita pizza', ...props } })
 }
 
@@ -61,5 +64,57 @@ describe('QuantityStepper', () => {
 
   it('announces the new quantity politely', () => {
     expect(mountStepper(2).get('output').attributes('aria-live')).toBe('polite')
+  })
+
+  it('exposes focus on the + for a parent that swaps controls', () => {
+    const wrapper = mount(QuantityStepper, {
+      props: { modelValue: 2, label: 'Margherita pizza' },
+      attachTo: document.body,
+    })
+
+    wrapper.vm.focusIncrease()
+
+    expect(document.activeElement).toBe(increase(wrapper).element)
+    wrapper.unmount()
+  })
+
+  describe('removable', () => {
+    it('turns the minus into a remove button at the minimum, which sets 0', async () => {
+      const wrapper = mountStepper(1, { removable: true })
+      const remove = wrapper.get('[aria-label="Remove Margherita pizza from cart"]')
+
+      expect(remove.attributes('aria-disabled')).toBeUndefined()
+      expect(remove.find('svg').exists()).toBe(true)
+      await remove.trigger('click')
+
+      expect(wrapper.emitted('update:modelValue')).toEqual([[0]])
+    })
+
+    it('is about the last unit only, whatever the minimum is', () => {
+      const atZero = mountStepper(0, { removable: true, min: 0 })
+
+      expect(atZero.find('[aria-label^="Remove"]').exists()).toBe(false)
+      expect(decrease(atZero).attributes('aria-disabled')).toBe('true')
+      expect(
+        mountStepper(1, { removable: true, min: 0 }).find('[aria-label^="Remove"]').exists(),
+      ).toBe(true)
+    })
+
+    it('is an ordinary minus above the minimum', async () => {
+      const wrapper = mountStepper(2, { removable: true })
+
+      expect(decrease(wrapper).find('svg').exists()).toBe(false)
+      await decrease(wrapper).trigger('click')
+
+      expect(wrapper.emitted('update:modelValue')).toEqual([[1]])
+    })
+  })
+
+  it('can be silent: no <output> (an implicit live region) and no aria-live', () => {
+    const wrapper = mountStepper(2, { silent: true })
+
+    expect(wrapper.find('output').exists()).toBe(false)
+    expect(wrapper.get('.stepper__value').text()).toBe('2')
+    expect(wrapper.get('.stepper__value').attributes('aria-live')).toBeUndefined()
   })
 })
