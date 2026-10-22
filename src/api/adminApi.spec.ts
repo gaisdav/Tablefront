@@ -3,6 +3,7 @@ import { adminApi } from '@/api/adminApi'
 import { isApiError } from '@/api/errors'
 import { menuApi } from '@/api/menuApi'
 import { ordersApi } from '@/api/ordersApi'
+import { createSeedOrders } from '@/mocks/fixtures'
 import { rejection, signInAsAdmin, signOut } from '@/test/helpers'
 import type { CreateOrderRequest, MenuItemInput } from '@/types/api'
 
@@ -42,16 +43,11 @@ describe('adminApi orders', () => {
   it('lists all orders newest first', async () => {
     const orders = await adminApi.listOrders()
 
-    expect(orders.map((order) => order.id)).toEqual([
-      'ord-1007',
-      'ord-1006',
-      'ord-1005',
-      'ord-1004',
-      'ord-1008',
-      'ord-1003',
-      'ord-1002',
-      'ord-1001',
-    ])
+    // The fixtures' own order, whatever their numbers: by when they were placed, newest first.
+    const newestFirst = createSeedOrders(new Date())
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((seeded) => seeded.id)
+    expect(orders.map((order) => order.id)).toEqual(newestFirst)
   })
 
   it('puts the later order first when two are created in the same millisecond', async () => {
@@ -111,6 +107,15 @@ describe('adminApi orders', () => {
     expect(out.status).toBe('out_for_delivery')
     expect(done.status).toBe('completed')
     expect(collected.status).toBe('completed')
+  })
+
+  it('explains a refused move in the words of the screen, not the codes', async () => {
+    const error = await rejection(adminApi.updateOrderStatus('ord-1008', 'cancelled'))
+
+    expect(error).toMatchObject({
+      status: 409,
+      message: 'A delivery that is on the way cannot become cancelled',
+    })
   })
 
   it('filters by the new status', async () => {

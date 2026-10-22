@@ -1,17 +1,21 @@
-import type { Fulfillment, OrderStatus } from '@/types/domain'
+import { FULFILLMENTS, type Fulfillment, type OrderStatus } from '@/types/domain'
 
 // Single source of truth for the order lifecycle: the UI uses it to decide which buttons to
-// render and the mock API uses it to reject invalid transitions with 409.
+// render, the guest stepper where the order is, and the mock API to reject invalid transitions
+// with 409. Everything else about statuses is derived from it.
 //
 // The way out of "ready" depends on how the order is received: a pickup is collected, a delivery
-// goes out with a courier first ("out for delivery" exists only for deliveries). Nothing can be
-// cancelled once the food is ready: it is made, or on its way.
-const TRANSITIONS: Record<Fulfillment, Record<OrderStatus, readonly OrderStatus[]>> = {
+// goes out with a courier first ("out for delivery" exists only for deliveries: a status that is
+// missing from a fulfillment's table does not exist for it). Nothing can be cancelled once the
+// food is ready: it is made, or on its way. The forward move is always listed first, so the
+// happy path is the first move from each status.
+type Lifecycle = Partial<Record<OrderStatus, readonly OrderStatus[]>>
+
+const TRANSITIONS: Record<Fulfillment, Lifecycle> = {
   pickup: {
     new: ['preparing', 'cancelled'],
     preparing: ['ready', 'cancelled'],
     ready: ['completed'],
-    out_for_delivery: [],
     completed: [],
     cancelled: [],
   },
@@ -30,7 +34,7 @@ export function allowedTransitions(
   from: OrderStatus,
   fulfillment: Fulfillment,
 ): readonly OrderStatus[] {
-  return TRANSITIONS[fulfillment][from]
+  return TRANSITIONS[fulfillment][from] ?? []
 }
 
 export function canTransition(
@@ -38,16 +42,17 @@ export function canTransition(
   to: OrderStatus,
   fulfillment: Fulfillment,
 ): boolean {
-  return TRANSITIONS[fulfillment][from].includes(to)
+  return allowedTransitions(from, fulfillment).includes(to)
 }
 
 /** Whether an order received this way can ever have this status (a pickup is never "on the way"). */
 export function isStatusFor(fulfillment: Fulfillment, status: OrderStatus): boolean {
-  return fulfillment === 'delivery' || status !== 'out_for_delivery'
+  return status in TRANSITIONS[fulfillment]
 }
 
+/** No way forward for any order, however it is received (a status an order cannot have has no moves). */
 export function isTerminalStatus(status: OrderStatus): boolean {
-  return status === 'completed' || status === 'cancelled'
+  return FULFILLMENTS.every((fulfillment) => allowedTransitions(status, fulfillment).length === 0)
 }
 
 const LABELS: Record<OrderStatus, string> = {
@@ -63,11 +68,15 @@ export function statusLabel(status: OrderStatus): string {
   return LABELS[status]
 }
 
-/** The happy path a guest follows; `cancelled` is a way out of it, not a step. */
+/** The happy path a guest follows, from the first status along each first move; `cancelled` is a way out of it, not a step. */
 export function progressSteps(fulfillment: Fulfillment): readonly OrderStatus[] {
-  return fulfillment === 'delivery'
-    ? ['new', 'preparing', 'ready', 'out_for_delivery', 'completed']
-    : ['new', 'preparing', 'ready', 'completed']
+  const steps: OrderStatus[] = ['new']
+  for (;;) {
+    const last = steps[steps.length - 1]
+    const next = last === undefined ? undefined : allowedTransitions(last, fulfillment)[0]
+    if (next === undefined) return steps
+    steps.push(next)
+  }
 }
 
 const ACTION_LABELS: Record<OrderStatus, string> = {

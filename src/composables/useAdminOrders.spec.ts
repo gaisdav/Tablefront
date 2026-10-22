@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { delay, http as mswHttp, HttpResponse } from 'msw'
 import { effectScope, type EffectScope } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isOrderStatus, isRecord } from '@/domain/guards'
 import { useAdminOrders } from '@/composables/useAdminOrders'
 import { db } from '@/mocks/db'
@@ -48,8 +48,12 @@ afterEach(() => {
 describe('useAdminOrders: moves that cannot be made', () => {
   it('does not even ask the server to send a pickup out for delivery', async () => {
     const requests = vi.fn()
-    server.events.on('request:start', ({ request }) => {
+    const onRequest = ({ request }: { request: Request }) => {
       if (request.method === 'PATCH') requests()
+    }
+    server.events.on('request:start', onRequest)
+    onTestFinished(() => {
+      server.events.removeListener('request:start', onRequest)
     })
     const result = board()
     await loaded(result)
@@ -60,7 +64,6 @@ describe('useAdminOrders: moves that cannot be made', () => {
 
     expect(requests).not.toHaveBeenCalled()
     expect(statusOf(result.orders, pickup.id)).toBe('ready')
-    server.events.removeAllListeners()
   })
 
   it('lets a delivery that is ready go out for delivery', async () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isRecord } from '@/domain/guards'
-import { menuItems } from '@/mocks/fixtures'
+import { menuItems, NEXT_ORDER_NUMBER } from '@/mocks/fixtures'
 import type { MenuItemInput } from '@/types/api'
 
 // jsdom is not a browser, so the service worker cannot be set up; the entry point is imported only
@@ -83,7 +83,7 @@ describe('a persistent mock database', () => {
     const db = await persistentPageLoad()
 
     expect(db.listMenuItems({ includeUnavailable: true })).toHaveLength(menuItems.length)
-    expect(db.getOrder('ord-1009')).toBeUndefined()
+    expect(db.getOrder(`ord-${String(NEXT_ORDER_NUMBER)}`)).toBeUndefined()
   })
 
   it('keeps an order across a reload, and keeps numbering from where it was', async () => {
@@ -94,6 +94,26 @@ describe('a persistent mock database', () => {
 
     expect(after.getOrder(order.id)).toEqual(order)
     expect(after.createOrder(orderInput).id).not.toBe(order.id)
+  })
+
+  it('loads a database saved before the seeded delivery on its way existed, and numbers on from it', async () => {
+    // Saved by an older build: no seeded "ord-1008", a guest's order took that number.
+    const first = await persistentPageLoad()
+    const guest = first.createOrder(orderInput)
+    const raw = readRaw()
+    raw.orders = raw.orders.filter((saved) => saved.id !== guest.id && saved.id !== 'ord-1008')
+    raw.orders.push({ ...guest, id: 'ord-1008' })
+    raw.nextOrderNumber = 1009
+    localStorage.setItem(KEY, JSON.stringify(raw))
+
+    const after = await persistentPageLoad()
+
+    expect(after.getOrder('ord-1008')).toMatchObject({ customer: guest.customer })
+    expect(after.getOrder('ord-1008')?.status).toBe('new') // the guest's, not the seeded delivery
+    expect(after.listOrders().map((o) => o.id)).toEqual([
+      ...new Set(after.listOrders().map((o) => o.id)),
+    ])
+    expect(after.createOrder(orderInput).id).toBe('ord-1009')
   })
 
   it('keeps a status change', async () => {

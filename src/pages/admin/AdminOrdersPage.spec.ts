@@ -30,6 +30,13 @@ function idWith(status: OrderStatus): string {
   return order.id
 }
 
+/** Chooses the status filter whose label starts with `label` ("Preparing" for "Preparing (2)"). */
+async function pickFilter(wrapper: VueWrapper, label: string): Promise<void> {
+  const chip = wrapper.findAll('.chip').find((candidate) => candidate.text().startsWith(label))
+  if (chip === undefined) throw new Error(`no filter called ${label}`)
+  await chip.get('input').setValue()
+}
+
 /** Clicks a row and waits for the navigation that selecting it causes. */
 async function choose(wrapper: VueWrapper, id: string): Promise<void> {
   await rowFor(wrapper, id).trigger('click')
@@ -77,7 +84,7 @@ describe('the orders board: the list', () => {
   it('filters by status, and keeps the filter in the URL', async () => {
     const { wrapper, router } = await mountBoard()
 
-    await wrapper.findAll('.chip input')[2]?.setValue()
+    await pickFilter(wrapper, 'Preparing')
     await flushPromises()
 
     expect(router.currentRoute.value.query.status).toBe('preparing')
@@ -103,7 +110,7 @@ describe('the orders board: the list', () => {
     await wrapper.get('button.button').trigger('click') // refresh
     await flushPromises()
 
-    await wrapper.findAll('.chip input')[6]?.setValue()
+    await pickFilter(wrapper, 'Cancelled')
 
     await vi.waitFor(() => {
       expect(wrapper.text()).toContain('No cancelled orders')
@@ -275,7 +282,7 @@ describe('the orders board: a delivery on its way', () => {
   it('counts and filters the orders on their way', async () => {
     const { wrapper, router } = await mountBoard()
 
-    await wrapper.findAll('.chip input')[4]?.setValue()
+    await pickFilter(wrapper, 'On the way')
     await flushPromises()
 
     expect(router.currentRoute.value.query.status).toBe('out_for_delivery')

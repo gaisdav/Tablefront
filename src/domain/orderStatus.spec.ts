@@ -8,9 +8,7 @@ import {
   statusLabel,
   transitionLabel,
 } from '@/domain/orderStatus'
-import { ORDER_STATUSES, type Fulfillment, type OrderStatus } from '@/types/domain'
-
-const FULFILLMENTS: Fulfillment[] = ['pickup', 'delivery']
+import { FULFILLMENTS, ORDER_STATUSES } from '@/types/domain'
 
 describe('order status transitions', () => {
   it.each([
@@ -78,26 +76,24 @@ describe('order status transitions', () => {
     expect(allowedTransitions('ready', 'delivery')).toEqual(['out_for_delivery'])
   })
 
+  it('gives a status an order cannot have no moves at all', () => {
+    expect(allowedTransitions('out_for_delivery', 'pickup')).toEqual([])
+    expect(canTransition('out_for_delivery', 'completed', 'pickup')).toBe(false)
+  })
+
   it('never moves a pickup into "on the way", from anywhere', () => {
     for (const from of ORDER_STATUSES) {
       expect(allowedTransitions(from, 'pickup')).not.toContain('out_for_delivery')
     }
   })
 
-  it('lets every status be reached on the way to "completed"', () => {
-    // From "new" a delivery and a pickup can each walk to the end, one allowed step at a time.
+  it('ends the happy path at "completed", through statuses the order can have', () => {
     for (const fulfillment of FULFILLMENTS) {
-      let status: OrderStatus = 'new'
-      const visited: string[] = [status]
-      while (!isTerminalStatus(status)) {
-        const next: OrderStatus | undefined = allowedTransitions(status, fulfillment).find(
-          (to) => to !== 'cancelled',
-        )
-        if (next === undefined) break
-        status = next
-        visited.push(status)
-      }
-      expect(visited).toEqual(progressSteps(fulfillment))
+      const steps = progressSteps(fulfillment)
+      expect(steps[0]).toBe('new')
+      expect(steps.at(-1)).toBe('completed')
+      expect(steps.every((step) => isStatusFor(fulfillment, step))).toBe(true)
+      expect(steps).not.toContain('cancelled')
     }
   })
 })

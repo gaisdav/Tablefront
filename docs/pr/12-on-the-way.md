@@ -9,11 +9,17 @@
 
 ## Decisions worth a look
 
-- **The transition table is keyed by fulfillment** (`TRANSITIONS[fulfillment][status]`), written out in full for both, instead of one table plus exceptions: it reads as the two lifecycles it describes, and `canTransition`, `allowedTransitions`, the stepper's steps and the saved-data check all come from it. `canTransition` and `allowedTransitions` now take the fulfillment, so a caller cannot forget it.
+- **The transition table is keyed by fulfillment** (`TRANSITIONS[fulfillment][status]`), written out in full for both, instead of one table plus exceptions: it reads as the two lifecycles it describes. A status that is missing from a fulfillment's table does not exist for it. Everything else is derived from the table: the allowed moves, whether a status is valid (`isStatusFor`), whether it is terminal, and the guest stepper's steps (the first move from each status, from "new"). `canTransition` and `allowedTransitions` now take the fulfillment, so a caller cannot forget it.
 - **No cancelling once the order is ready or on its way**, as before for "ready": the food is made, or out of the door.
 - **The saved demo database rejects a pickup that is on the way**, like the other impossible combinations (a delivery with no address), so a hand-edited or damaged database is dropped. The shape of what is saved did not change, so a database saved before this change loads as it is.
 - **This changes the status contract of the spec** (five statuses, one lifecycle for all orders); it is an extension, written down in `docs/DECISIONS.md`.
 - **The stepper's width is set by the number of steps** (`--steps`), not by a fixed four; the first version wrapped the fifth step onto a second row, which was found by looking at it in Chrome.
+
+## Review follow-up
+
+Fixed: the stepper's steps and `isTerminalStatus`/`isStatusFor` are derived from the transition table, so they cannot drift from it (the hand-written lists and the special cases are gone); the `409` message uses the on-screen labels ("A delivery that is on the way cannot become cancelled"); the MSW listener in the board's test is removed in `onTestFinished`, only its own; the end-to-end tests are scoped to the stepper and share their setup (`placeOrder`, `staffOpens`, `pressStatus`); specs no longer depend on fixture numbers (the expected list order is computed from the fixtures, the "next number" is `NEXT_ORDER_NUMBER`, and the board's filter chips are found by their label, not their position); a test covers a database saved by an older build, where a guest's order took the number now used by the seeded delivery.
+
+Not changed: a saved database with one impossible order is still dropped as a whole. That is the documented rule for the demo database (a database with a few bad records would be wrong in ways nobody could see), and the only new trigger is a combination the app cannot produce.
 
 ## Not done, on purpose
 
