@@ -41,3 +41,16 @@ export const PROGRESS_STEPS = [
   'ready',
   'completed',
 ] as const satisfies readonly OrderStatus[]
+
+const ACTION_LABELS: Record<OrderStatus, string> = {
+  new: 'Reopen',
+  preparing: 'Start preparing',
+  ready: 'Mark as ready',
+  completed: 'Mark as completed',
+  cancelled: 'Cancel order',
+}
+
+/** What the button that moves an order to `to` says. */
+export function transitionLabel(to: OrderStatus): string {
+  return ACTION_LABELS[to]
+}
