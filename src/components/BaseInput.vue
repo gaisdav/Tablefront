@@ -85,7 +85,7 @@ const describedBy = computed(() => {
 .field__input {
   min-height: var(--tap-size);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   transition: border-color var(--duration-fast) var(--ease-out);

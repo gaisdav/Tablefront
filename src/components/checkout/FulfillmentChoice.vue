@@ -70,7 +70,7 @@ const options: { value: Fulfillment; title: string; description: string }[] = [
   height: 100%;
   min-height: var(--tap-size);
   padding: var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   transition:

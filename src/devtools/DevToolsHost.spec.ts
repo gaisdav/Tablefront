@@ -114,19 +114,59 @@ describe('Dev tools panel', () => {
       vi.restoreAllMocks()
     })
 
-    it('brings back the original menu and orders, then reloads the page', async () => {
+    async function openPanel() {
+      const wrapper = await mountApp()
+      await toggleButton(wrapper).trigger('click')
+      const reset = () =>
+        wrapper
+          .findAll('button')
+          .find((button) => /reset demo data|click again/i.test(button.text()))
+      return { wrapper, reset }
+    }
+
+    it('asks before doing anything: one click only changes the button', async () => {
       const dish = menuItems[0]
       if (dish === undefined) throw new Error('no fixtures')
       db.deleteMenuItem(dish.id)
-      expect(db.getMenuItem(dish.id)).toBeUndefined()
-      const wrapper = await mountApp()
-      await toggleButton(wrapper).trigger('click')
+      const { reset } = await openPanel()
 
-      const reset = wrapper.findAll('button').find((button) => button.text() === 'Reset demo data')
-      await reset?.trigger('click')
+      await reset()?.trigger('click')
+
+      expect(reset()?.text()).toBe('Sure? Click again')
+      expect(db.getMenuItem(dish.id)).toBeUndefined()
+      expect(reload.reloadPage).not.toHaveBeenCalled()
+    })
+
+    it('brings back the original menu and orders after the second click, then reloads', async () => {
+      const dish = menuItems[0]
+      if (dish === undefined) throw new Error('no fixtures')
+      db.deleteMenuItem(dish.id)
+      const { reset } = await openPanel()
+
+      await reset()?.trigger('click')
+      await reset()?.trigger('click')
 
       expect(db.getMenuItem(dish.id)).toEqual(dish)
       expect(reload.reloadPage).toHaveBeenCalledOnce()
+    })
+
+    it('forgets the first click when the panel is closed and opened again', async () => {
+      const { wrapper, reset } = await openPanel()
+      await reset()?.trigger('click')
+
+      await toggleButton(wrapper).trigger('click')
+      await toggleButton(wrapper).trigger('click')
+
+      expect(reset()?.text()).toBe('Reset demo data')
+    })
+
+    it('forgets the first click when focus leaves the button', async () => {
+      const { reset } = await openPanel()
+
+      await reset()?.trigger('click')
+      await reset()?.trigger('blur')
+
+      expect(reset()?.text()).toBe('Reset demo data')
     })
   })
 
@@ -139,6 +179,29 @@ describe('Dev tools panel', () => {
 
     expect(toggleButton(wrapper).attributes('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(toggleButton(wrapper).element)
+  })
+
+  it('keeps its Escape to itself while open, so it does not also close something else', async () => {
+    const wrapper = await mountApp()
+    await toggleButton(wrapper).trigger('click')
+    const outside = vi.fn()
+    document.addEventListener('keydown', outside)
+
+    await wrapper.get('input[value="fast"]').trigger('keydown', { key: 'Escape' })
+
+    expect(outside).not.toHaveBeenCalled()
+    document.removeEventListener('keydown', outside)
+  })
+
+  it('leaves Escape alone while the panel is closed', async () => {
+    const wrapper = await mountApp()
+    const outside = vi.fn()
+    document.addEventListener('keydown', outside)
+
+    await toggleButton(wrapper).trigger('keydown', { key: 'Escape' })
+
+    expect(outside).toHaveBeenCalledOnce()
+    document.removeEventListener('keydown', outside)
   })
 
   it('makes real requests fail when errors are forced', async () => {

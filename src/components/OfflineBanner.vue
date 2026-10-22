@@ -14,9 +14,26 @@ const online = useOnline()
 </template>
 
 <style scoped>
+/* Floats over the page instead of pushing it down: nothing moves when the connection drops. It
+   sits above the space the Dev tools button reserves, and under dialogs and toasts. */
+.banner-host {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + var(--reserved-bottom, 0px));
+  left: var(--space-4);
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .banner {
-  padding: var(--space-2) var(--gutter);
+  max-width: 32rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
   background: var(--color-danger-soft);
+  box-shadow: var(--shadow-md);
   color: var(--color-danger);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);

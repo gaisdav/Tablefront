@@ -34,7 +34,8 @@ function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/', name: 'menu', component: Fragile },
+      { path: '/', name: 'menu', component: { render: () => h('p', 'Menu page') } },
+      { path: '/crash', name: 'crash', component: Fragile },
       { path: '/other', name: 'other', component: { render: () => h('p', 'Elsewhere') } },
       { path: '/clicky', name: 'clicky', component: Clicky },
     ],
@@ -67,7 +68,7 @@ afterEach(() => {
 describe('ErrorBoundary', () => {
   it('renders its content when nothing is wrong', async () => {
     broken.value = false
-    const { wrapper } = await mountAt('/')
+    const { wrapper } = await mountAt('/crash')
 
     expect(wrapper.text()).toBe('All good')
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
@@ -75,7 +76,7 @@ describe('ErrorBoundary', () => {
   })
 
   it('replaces a page that fails to render with a friendly fallback, and reports the error', async () => {
-    const { wrapper } = await mountAt('/')
+    const { wrapper } = await mountAt('/crash')
 
     const alert = wrapper.get('[role="alert"]')
     expect(alert.get('h1').text()).toBe('Something went wrong')
@@ -87,17 +88,35 @@ describe('ErrorBoundary', () => {
     wrapper.unmount()
   })
 
-  it('catches an error thrown by an event handler too', async () => {
+  it('keeps the page when only an event handler fails, and still reports it', async () => {
     const { wrapper } = await mountAt('/clicky')
 
     await wrapper.get('button').trigger('click')
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('Something went wrong')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.get('button').text()).toBe('Press')
+    expect(report).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ message: 'handler boom' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('puts focus on the fallback heading, and again when the retry fails too', async () => {
+    const { wrapper } = await mountAt('/crash')
+    await flushPromises()
+    expect(document.activeElement?.textContent).toBe('Something went wrong')
+
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    await wrapper.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+
+    expect(document.activeElement?.textContent).toBe('Something went wrong')
     wrapper.unmount()
   })
 
   it('"Try again" renders the page again, which works once the cause is gone', async () => {
-    const { wrapper } = await mountAt('/')
+    const { wrapper } = await mountAt('/crash')
     broken.value = false
 
     await wrapper.get('[role="alert"] button').trigger('click')
@@ -107,7 +126,7 @@ describe('ErrorBoundary', () => {
   })
 
   it('shows the fallback again if the page still fails after "Try again"', async () => {
-    const { wrapper } = await mountAt('/')
+    const { wrapper } = await mountAt('/crash')
 
     await wrapper.get('[role="alert"] button').trigger('click')
 
@@ -116,21 +135,19 @@ describe('ErrorBoundary', () => {
   })
 
   it('"Back to the menu" leaves the broken page', async () => {
-    const { wrapper, router } = await mountAt('/clicky')
-    await wrapper.get('button').trigger('click')
-    broken.value = false
+    const { wrapper, router } = await mountAt('/crash')
 
     const buttons = wrapper.findAll('[role="alert"] button')
     await buttons[1]?.trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('menu')
-    expect(wrapper.text()).toBe('All good')
+    expect(wrapper.text()).toBe('Menu page')
     wrapper.unmount()
   })
 
   it('recovers by itself when the user navigates somewhere else', async () => {
-    const { wrapper, router } = await mountAt('/')
+    const { wrapper, router } = await mountAt('/crash')
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
 
     await router.push('/other')

@@ -131,9 +131,9 @@ const emptyTitle = computed(() => {
         @retry="menu.execute"
       >
         <template #loading>
-          <div class="grid grid--loading">
-            <div v-for="n in 6" :key="n" class="card-skeleton">
-              <BaseSkeleton variant="block" height="7rem" />
+          <div class="grid">
+            <div v-for="n in 12" :key="n" class="card-skeleton">
+              <BaseSkeleton variant="block" height="auto" class="card-skeleton__media" />
               <BaseSkeleton width="60%" />
               <BaseSkeleton />
             </div>
@@ -207,11 +207,9 @@ const emptyTitle = computed(() => {
   list-style: none;
 }
 
-/* Fills the window while loading, so the footer is already below the fold and does not jump out
-   of sight when the real (much longer) list arrives. */
-.grid--loading {
-  align-content: start;
-  min-height: 100dvh;
+.card-skeleton__media {
+  /* The same proportions as a dish photo, so the placeholder is as tall as the card will be. */
+  aspect-ratio: 4 / 3;
 }
 
 .card-skeleton {

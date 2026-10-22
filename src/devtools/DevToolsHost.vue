@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, useId, watch } from 'vue'
+import { reactive, ref, useId, watch } from 'vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseCheckbox from '@/components/BaseCheckbox.vue'
 import { simulateOffline } from '@/composables/useOnline'
@@ -44,28 +44,39 @@ function resetConditions(): void {
 
 // Orders and menu edits are kept across reloads; this is the way back to the fixtures. The page
 // reloads because everything on screen (and in the stores) was built from the old data.
+// It destroys the demo's orders and menu edits, so it asks first, on the button itself.
+const confirmingReset = ref(false)
+
 function resetData(): void {
+  if (!confirmingReset.value) {
+    confirmingReset.value = true
+    return
+  }
   resetDb()
   reloadPage()
 }
 
-// The button floats over the page; this makes room at the very bottom (see base.css), so it never
-// covers the last thing on a page, such as the footer links.
-onMounted(() => {
-  document.documentElement.classList.add('has-devtools')
-})
-onUnmounted(() => {
-  document.documentElement.classList.remove('has-devtools')
-})
+function toggle(): void {
+  if (open.value) close()
+  else open.value = true
+}
+
+function onEscape(event: KeyboardEvent): void {
+  // Only for an open panel; otherwise Escape belongs to whatever else is on the page.
+  if (!open.value) return
+  event.stopPropagation()
+  close()
+}
 
 function close(): void {
   open.value = false
+  confirmingReset.value = false
   root.value?.querySelector<HTMLElement>('.toggle')?.focus()
 }
 </script>
 
 <template>
-  <div ref="root" class="devtools" @keydown.esc="close">
+  <div ref="root" class="devtools" @keydown.esc="onEscape">
     <section v-if="open" :id="panelId" class="panel" aria-labelledby="devtools-title">
       <h2 id="devtools-title" class="panel__title">Dev tools</h2>
       <p class="text-muted panel__hint">
@@ -93,7 +104,9 @@ function close(): void {
 
       <div class="panel__actions">
         <BaseButton variant="secondary" @click="resetConditions">Reset network</BaseButton>
-        <BaseButton variant="danger" @click="resetData">Reset demo data</BaseButton>
+        <BaseButton variant="danger" @click="resetData" @blur="confirmingReset = false">
+          {{ confirmingReset ? 'Sure? Click again' : 'Reset demo data' }}
+        </BaseButton>
       </div>
     </section>
 
@@ -102,7 +115,7 @@ function close(): void {
       variant="secondary"
       :aria-expanded="open"
       :aria-controls="open ? panelId : undefined"
-      @click="open = !open"
+      @click="toggle"
     >
       Dev tools
     </BaseButton>

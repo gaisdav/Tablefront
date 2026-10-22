@@ -22,12 +22,43 @@ export function installRouteAccessibility(router: Router): void {
     const firstNavigation = from.matched.length === 0
     if (firstNavigation || to.path === from.path) return
     // After the new page has rendered.
-    void nextTick(() => {
-      const target = document.querySelector<HTMLElement>('h1') ?? document.getElementById('main')
-      if (target === null) return
-      // A heading is not focusable by default; -1 allows focus from code but not from Tab.
-      if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
-      target.focus({ preventScroll: true })
-    })
+    void nextTick(moveFocusToPage)
   })
+}
+
+/** How long to wait for a heading that appears only once the page's data has arrived. */
+const HEADING_WAIT_MS = 3000
+
+function focusElement(target: HTMLElement): void {
+  // A heading is not focusable by default; -1 allows focus from code but not from Tab.
+  if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
+  target.focus({ preventScroll: true })
+}
+
+/**
+ * The page's own heading if it is there. Some pages draw theirs only after loading (an order), so
+ * until then the content area takes the focus (the old focus is gone with the old page), and the
+ * focus moves on to the heading when it shows up, unless the user has gone elsewhere meanwhile.
+ */
+function moveFocusToPage(): void {
+  const main = document.querySelector<HTMLElement>('main')
+  const heading = main?.querySelector<HTMLElement>('h1')
+  if (heading) {
+    focusElement(heading)
+    return
+  }
+  if (main === null) return
+  focusElement(main)
+
+  const watcher = new MutationObserver(() => {
+    const late = main.querySelector<HTMLElement>('h1')
+    if (late === null) return
+    watcher.disconnect()
+    clearTimeout(giveUp)
+    if (document.activeElement === main) focusElement(late)
+  })
+  const giveUp = setTimeout(() => {
+    watcher.disconnect()
+  }, HEADING_WAIT_MS)
+  watcher.observe(main, { childList: true, subtree: true })
 }

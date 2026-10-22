@@ -94,7 +94,7 @@ function onClick(event: MouseEvent): void {
 }
 
 .button--secondary {
-  border-color: var(--color-border-strong);
+  border-color: var(--color-control-border);
   background: var(--color-surface);
   color: var(--color-text);
 }

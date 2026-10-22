@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import OfflineBanner from '@/components/OfflineBanner.vue'
 import { simulateOffline } from '@/composables/useOnline'
 
@@ -53,14 +53,15 @@ describe('OfflineBanner', () => {
     wrapper.unmount()
   })
 
-  it('stops listening once unmounted', () => {
-    const removed = vi.spyOn(window, 'removeEventListener')
-    const wrapper = mount(OfflineBanner)
+  it('keeps working for one banner after another has been unmounted', async () => {
+    const first = mount(OfflineBanner)
+    const second = mount(OfflineBanner)
+    first.unmount()
 
-    wrapper.unmount()
+    window.dispatchEvent(new Event('offline'))
+    await second.vm.$nextTick()
 
-    expect(removed).toHaveBeenCalledWith('online', expect.any(Function))
-    expect(removed).toHaveBeenCalledWith('offline', expect.any(Function))
-    removed.mockRestore()
+    expect(second.text()).toContain('You are offline')
+    second.unmount()
   })
 })

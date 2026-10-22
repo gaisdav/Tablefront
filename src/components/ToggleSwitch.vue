@@ -52,7 +52,7 @@ function toggle(): void {
   height: 1.5rem;
   padding: 2px;
   border-radius: var(--radius-full);
-  background: var(--color-border-strong);
+  background: var(--color-control-border);
   transition: background-color var(--duration-fast) var(--ease-out);
 }
 
