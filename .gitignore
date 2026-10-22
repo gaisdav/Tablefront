@@ -7,5 +7,5 @@ coverage
 .vscode/*
 !.vscode/extensions.json
 
-# Private working notes (spec, job description), not part of the repo
+# Private working notes (specs, plans), not part of the repo
 /local-docs/
