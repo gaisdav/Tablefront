@@ -8,12 +8,12 @@
 - TypeScript: `strict` plus `noUncheckedIndexedAccess` and `noUnused*`; `verbatimModuleSyntax` comes from `@vue/tsconfig`. Two projects: `tsconfig.app.json` (`src`) and `tsconfig.node.json` (`vite.config.ts`), checked together by `vue-tsc --build`.
 - ESLint flat config (`typescript-eslint` strict type-checked, `eslint-plugin-vue`, `eslint-config-prettier`) and Prettier.
 - Vitest (jsdom) with `@vue/test-utils` and one trivial component test (`App.spec.ts`).
-- GitHub Actions: format check, lint, typecheck, test, build on every PR and on `main`.
+- GitHub Actions: format check, lint, typecheck, test, build on every PR and on `main`. Read-only token (`permissions: contents: read`); runs are cancelled on superseded PR pushes only, never on `main`.
 - `.editorconfig`, `.nvmrc`, README stub with the script table.
 
 ## Why (decisions and trade-offs)
 
-- **Hard rules are lint rules.** The spec's rules are enforced by ESLint rather than left to review: `no-explicit-any`, `no-non-null-assertion`, `no-console`, `vue/block-lang` (TS only), `vue/component-api-style` (`script-setup` only), type-based `defineProps`/`defineEmits`. Casts are banned via `no-restricted-syntax` on `as` (except `as const`); a legitimate boundary cast needs an inline `eslint-disable-next-line ... -- reason`, which doubles as the one-line explanation the spec asks for.
+- **Hard rules are lint rules.** The spec's rules are enforced by ESLint rather than left to review: `no-explicit-any`, `no-non-null-assertion`, `no-console`, `vue/block-lang` (TS only), `vue/component-api-style` (`script-setup` only), type-based `defineProps`/`defineEmits`. Casts are banned via `no-restricted-syntax` on `as` (except `as const`) and `<T>value`; a legitimate boundary cast needs an inline `eslint-disable-next-line ... -- reason`, which doubles as the one-line explanation the spec asks for.
 - **TypeScript 6.0, not 7.** `typescript-eslint` declares support for `<6.1.0`, so TS is pinned to `~6.0.3`. Revisit once `typescript-eslint` supports 7.
 - **`src/shims-vue.d.ts`.** typescript-eslint cannot read SFCs, so without a `*.vue` module declaration every `.vue` import is typed `error` and type-aware rules fire. `vue-tsc` ignores the shim and uses the real component types.
 - **Type-aware linting only under `src/`.** Config files are outside the app tsconfig, so they get `disableTypeChecked`.
@@ -25,14 +25,14 @@
 
 The spec says to ask before adding dependencies. These are tooling support for rows already in the table, not runtime code:
 
-| Package                  | Needed because                                        |
-| ------------------------ | ----------------------------------------------------- |
-| `jsdom`                  | DOM environment for Vitest + `@vue/test-utils`        |
-| `@vitejs/plugin-vue`     | Vue SFC support in Vite                               |
-| `@vue/tsconfig`          | Vue team's baseline tsconfig                          |
-| `@eslint/js`, `globals`  | ESLint flat-config base rules and environment globals |
-| `eslint-config-prettier` | Turns off ESLint rules that conflict with Prettier    |
-| `@types/node`            | Types for `vite.config.ts`                            |
+| Package                  | Needed because                                                        |
+| ------------------------ | --------------------------------------------------------------------- |
+| `jsdom`                  | DOM environment for Vitest + `@vue/test-utils`                        |
+| `@vitejs/plugin-vue`     | Vue SFC support in Vite                                               |
+| `@vue/tsconfig`          | Vue team's baseline tsconfig                                          |
+| `@eslint/js`, `globals`  | ESLint flat-config base rules and environment globals                 |
+| `eslint-config-prettier` | Turns off ESLint rules that conflict with Prettier                    |
+| `@types/node`            | Types for `vite.config.ts`, pinned to `^22` to match the Node runtime |
 
 I also added `pnpm format:check` to CI on top of lint/typecheck/test/build, so unformatted code fails the build. Easy to drop if you would rather not.
 
