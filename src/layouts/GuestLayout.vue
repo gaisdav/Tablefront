@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import AppBrand from '@/components/AppBrand.vue'
+import CartHost from '@/layouts/CartHost.vue'
 </script>
 
 <template>
@@ -10,9 +11,12 @@ import AppBrand from '@/components/AppBrand.vue'
     <header class="header">
       <div class="container header__inner">
         <AppBrand />
-        <nav aria-label="Main">
-          <RouterLink :to="{ name: 'menu' }" class="nav-link">Menu</RouterLink>
-        </nav>
+        <div class="header__actions">
+          <nav aria-label="Main">
+            <RouterLink :to="{ name: 'menu' }" class="nav-link">Menu</RouterLink>
+          </nav>
+          <CartHost />
+        </div>
       </div>
     </header>
 
@@ -50,6 +54,12 @@ import AppBrand from '@/components/AppBrand.vue'
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .nav-link {

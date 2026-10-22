@@ -65,4 +65,28 @@ describe('MenuItemCard', () => {
   it('does not say sold out for an available item', () => {
     expect(mountCard().text()).not.toContain('Sold out')
   })
+
+  it('has an Add button named after the dish, which emits the dish', async () => {
+    const wrapper = mountCard()
+
+    await wrapper.get('[aria-label="Add Margherita pizza to cart"]').trigger('click')
+
+    expect(wrapper.emitted('add')).toEqual([[item]])
+  })
+
+  it('says how many are already in the cart, only when some are', () => {
+    expect(mountCard().text()).not.toContain('in cart')
+    expect(mount(MenuItemCard, { props: { item, quantityInCart: 0 } }).text()).not.toContain(
+      'in cart',
+    )
+    expect(mount(MenuItemCard, { props: { item, quantityInCart: 3 } }).text()).toContain(
+      '3 in cart',
+    )
+  })
+
+  it('cannot be added when sold out', () => {
+    const wrapper = mountCard({ available: false })
+
+    expect(wrapper.find('[aria-label^="Add "]').exists()).toBe(false)
+  })
 })

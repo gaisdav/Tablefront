@@ -10,9 +10,12 @@ import CategoryChips from '@/components/menu/CategoryChips.vue'
 import MenuItemCard from '@/components/menu/MenuItemCard.vue'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useMenuFilters } from '@/composables/useMenuFilters'
+import { useCartStore } from '@/stores/cart'
 import type { MenuItem } from '@/types/domain'
 
 const { category, q, searchInput, setCategory, clearFilters } = useMenuFilters()
+
+const cart = useCartStore()
 
 const categories = useAsyncState((signal) => menuApi.listCategories(signal))
 
@@ -153,7 +156,11 @@ const emptyTitle = computed(() => {
         <template #default="{ data }">
           <ul class="grid" role="list">
             <li v-for="item in data.items" :key="item.id">
-              <MenuItemCard :item="item" />
+              <MenuItemCard
+                :item="item"
+                :quantity-in-cart="cart.quantityOf(item.id)"
+                @add="cart.add($event)"
+              />
             </li>
           </ul>
         </template>

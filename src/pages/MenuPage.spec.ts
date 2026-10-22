@@ -1,23 +1,16 @@
-import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import { delay, http as mswHttp, HttpResponse } from 'msw'
-import { createMemoryHistory, type Router } from 'vue-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import App from '@/App.vue'
 import { setMockConditions } from '@/mocks/conditions'
 import { menuItems } from '@/mocks/fixtures'
 import { server } from '@/mocks/server'
-import { createAppRouter } from '@/router'
+import { mountAppAt, unmountApps } from '@/test/mountApp'
 import type { MenuItem } from '@/types/domain'
 
-const mounted: VueWrapper[] = []
 const availableCount = menuItems.filter((item) => item.available).length
 
-async function mountMenu(path = '/'): Promise<{ wrapper: VueWrapper; router: Router }> {
-  const router = createAppRouter(createMemoryHistory())
-  await router.push(path)
-  await router.isReady()
-  const wrapper = mount(App, { global: { plugins: [router] }, attachTo: document.body })
-  mounted.push(wrapper)
+async function mountMenu(path = '/') {
+  const { wrapper, router } = await mountAppAt(path)
   return { wrapper, router }
 }
 
@@ -57,7 +50,7 @@ function dish(name: string): MenuItem {
 }
 
 afterEach(() => {
-  for (const wrapper of mounted.splice(0)) wrapper.unmount()
+  unmountApps()
   vi.useRealTimers()
 })
 

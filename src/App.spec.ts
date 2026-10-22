@@ -1,17 +1,14 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import { createMemoryHistory } from 'vue-router'
-import { describe, expect, it } from 'vitest'
-import App from '@/App.vue'
-import { createAppRouter } from '@/router'
+import { flushPromises } from '@vue/test-utils'
+import { afterEach, describe, expect, it } from 'vitest'
+import { mountAppAt, unmountApps } from '@/test/mountApp'
 
 async function mountAt(path: string) {
-  const router = createAppRouter(createMemoryHistory())
-  await router.push(path)
-  await router.isReady()
-  const wrapper = mount(App, { global: { plugins: [router] } })
-  await flushPromises()
+  const { wrapper } = await mountAppAt(path)
+  await flushPromises() // let the lazy page component load
   return wrapper
 }
+
+afterEach(unmountApps)
 
 describe('guest shell', () => {
   it('renders the page inside the guest layout with a skip link and landmarks', async () => {

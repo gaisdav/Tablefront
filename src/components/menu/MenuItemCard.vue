@@ -1,8 +1,15 @@
 <script setup lang="ts">
+import BaseButton from '@/components/BaseButton.vue'
 import { formatCents } from '@/domain/money'
 import type { MenuItem } from '@/types/domain'
 
-defineProps<{ item: MenuItem }>()
+defineProps<{
+  item: MenuItem
+  /** How many of this dish are in the cart already. */
+  quantityInCart?: number
+}>()
+
+defineEmits<{ add: [item: MenuItem] }>()
 </script>
 
 <template>
@@ -37,6 +44,16 @@ defineProps<{ item: MenuItem }>()
         <li v-for="allergen in item.allergens" :key="allergen" class="badge">{{ allergen }}</li>
       </ul>
       <p v-if="!item.available" class="card__status">Sold out</p>
+      <div v-else class="card__actions">
+        <BaseButton
+          variant="secondary"
+          :aria-label="`Add ${item.name} to cart`"
+          @click="$emit('add', item)"
+        >
+          Add
+        </BaseButton>
+        <p v-if="quantityInCart" class="card__in-cart">{{ quantityInCart }} in cart</p>
+      </div>
     </div>
   </article>
 </template>
@@ -137,6 +154,18 @@ defineProps<{ item: MenuItem }>()
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   text-transform: capitalize;
+}
+
+.card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.card__in-cart {
+  color: var(--color-accent-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
 }
 
 .card__status {
