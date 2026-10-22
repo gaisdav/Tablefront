@@ -140,6 +140,73 @@ describe('a persistent mock database', () => {
   })
 })
 
+describe('two tabs', () => {
+  it("share one database: neither loses the other's order or reuses its id", async () => {
+    const tabA = await persistentPageLoad()
+    const tabB = await persistentPageLoad() // loaded before A has done anything
+
+    const fromA = tabA.createOrder(orderInput)
+    const fromB = tabB.createOrder(orderInput)
+
+    expect(fromB.id).not.toBe(fromA.id)
+    expect(tabB.getOrder(fromA.id)).toEqual(fromA)
+    expect(tabA.getOrder(fromB.id)).toEqual(fromB)
+    expect((await persistentPageLoad()).listOrders().map((order) => order.id)).toEqual(
+      expect.arrayContaining([fromA.id, fromB.id]),
+    )
+  })
+
+  it('see a status change made in the other', async () => {
+    const tabA = await persistentPageLoad()
+    const tabB = await persistentPageLoad()
+    const order = tabA.createOrder(orderInput)
+
+    tabB.setOrderStatus(order.id, 'ready')
+
+    expect(tabA.getOrder(order.id)?.status).toBe('ready')
+  })
+})
+
+describe('persistence edge cases', () => {
+  it('can be switched on twice without throwing away what was done in between', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    const module = await pageLoad()
+    module.enableDbPersistence()
+    const order = module.db.createOrder(orderInput)
+
+    module.enableDbPersistence()
+
+    expect(module.db.getOrder(order.id)).toEqual(order)
+  })
+
+  it('does not replace newer memory with older storage after a failed save', async () => {
+    const module = await pageLoad()
+    module.enableDbPersistence()
+    const saved = module.db.createOrder(orderInput)
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    const unsaved = module.db.createOrder(orderInput)
+
+    expect(module.db.getOrder(unsaved.id)).toEqual(unsaved)
+    expect(module.db.getOrder(saved.id)).toEqual(saved)
+  })
+
+  it('keeps only the newest orders, so it stays small enough to save', async () => {
+    const module = await pageLoad()
+    module.enableDbPersistence()
+    const first = module.db.createOrder(orderInput)
+
+    for (let count = 0; count < module.MAX_ORDERS + 5; count += 1) module.db.createOrder(orderInput)
+
+    expect(module.db.listOrders()).toHaveLength(module.MAX_ORDERS)
+    expect(module.db.getOrder(first.id)).toBeUndefined()
+    expect((await persistentPageLoad()).listOrders()).toHaveLength(module.MAX_ORDERS)
+  })
+})
+
 describe('a saved database that cannot be trusted', () => {
   async function savedWith(change: (raw: Raw) => void) {
     const before = await persistentPageLoad()
@@ -180,6 +247,20 @@ describe('a saved database that cannot be trusted', () => {
         (first(raw.orders).lines = [
           { menuItemId: 'x', name: 'x', unitPriceCents: 100, quantity: 0 },
         ]),
+    ],
+    ['fixtures it was not built on', (raw) => (raw.fixtures = 'older fixtures')],
+    ['a counter that would reuse an id', (raw) => (raw.nextOrderNumber = 1)],
+    ['a menu item counter that would reuse an id', (raw) => (raw.nextMenuItemNumber = 1)],
+    [
+      'a menu item in a category that does not exist',
+      (raw) => (first(raw.menuItems).categoryId = 'cat-x'),
+    ],
+    ['a total that is not the sum of the lines', (raw) => (first(raw.orders).totalCents = 1)],
+    ['a delivery without an address', (raw) => (first(raw.orders).fulfillment = 'delivery')],
+    [
+      'a pickup with an address',
+      (raw) =>
+        (first(raw.orders).customer = { name: 'Anna', phone: '+49 30 1234567', address: 'x' }),
     ],
     ['a duplicate order id', (raw) => raw.orders.push({ ...first(raw.orders) })],
     [
