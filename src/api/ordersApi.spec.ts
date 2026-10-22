@@ -112,6 +112,20 @@ describe('ordersApi.createOrder', () => {
     })
   })
 
+  it('limits the number of lines and the length of a note', async () => {
+    const tooManyLines = await fieldErrorsFor(
+      pickupOrder({
+        lines: Array.from({ length: 31 }, () => ({ menuItemId: 'item-5', quantity: 1 })),
+      }),
+    )
+    const longNote = await fieldErrorsFor(
+      pickupOrder({ lines: [{ menuItemId: 'item-5', quantity: 1, note: 'x'.repeat(201) }] }),
+    )
+
+    expect(tooManyLines).toEqual({ lines: 'An order can have at most 30 lines' })
+    expect(longNote).toEqual({ 'lines.0.note': 'Note must be 200 characters or fewer' })
+  })
+
   it('does not create an order when validation fails', async () => {
     await fieldErrorsFor(pickupOrder({ lines: [] }))
 

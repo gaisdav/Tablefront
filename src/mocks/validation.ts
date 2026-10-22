@@ -6,9 +6,26 @@ export type Validation<T> = { ok: true; value: T } | { ok: false; fields: Record
 
 const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/
 const MAX_QUANTITY = 99
+const MAX_LINES = 30
+const MAX_NOTE_LENGTH = 200
 
 function text(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() : null
+}
+
+/** Returns the cleaned URL, `null` for "no image", or `undefined` when the value is not acceptable. */
+function imageUrlOrNull(value: unknown): string | null | undefined {
+  if (value === null) return null
+  const trimmed = text(value)
+  if (trimmed === null) return undefined
+  if (trimmed === '') return null
+  if (trimmed.startsWith('data:image/')) return trimmed
+  try {
+    const { protocol } = new URL(trimmed)
+    return protocol === 'http:' || protocol === 'https:' ? trimmed : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -42,6 +59,8 @@ export function validateOrder(
   const lines: Order['lines'] = []
   if (!Array.isArray(input.lines) || input.lines.length === 0) {
     fields.lines = 'Add at least one item'
+  } else if (input.lines.length > MAX_LINES) {
+    fields.lines = `An order can have at most ${String(MAX_LINES)} lines`
   } else {
     input.lines.forEach((raw: unknown, index) => {
       const lineInput = isRecord(raw) ? raw : {}
@@ -61,8 +80,12 @@ export function validateOrder(
       if (!quantityOk)
         fields[`${key}.quantity`] = `Quantity must be between 1 and ${String(MAX_QUANTITY)}`
 
+      const note = text(lineInput.note)
+      if (note !== null && note.length > MAX_NOTE_LENGTH) {
+        fields[`${key}.note`] = `Note must be ${String(MAX_NOTE_LENGTH)} characters or fewer`
+      }
+
       if (item?.available === true && quantityOk) {
-        const note = text(lineInput.note)
         lines.push({
           menuItemId: item.id,
           name: item.name,
@@ -122,9 +145,8 @@ export function validateMenuItem(
     fields.categoryId = 'Choose an existing category'
   }
 
-  const imageUrl = input.imageUrl
-  if (imageUrl !== null && typeof imageUrl !== 'string')
-    fields.imageUrl = 'Image must be a URL or empty'
+  const imageUrl = imageUrlOrNull(input.imageUrl)
+  if (imageUrl === undefined) fields.imageUrl = 'Image must be an http(s) URL or empty'
 
   const available = input.available
   if (typeof available !== 'boolean') fields.available = 'Availability must be true or false'
@@ -141,7 +163,7 @@ export function validateMenuItem(
     description === null ||
     typeof price !== 'number' ||
     typeof categoryId !== 'string' ||
-    (imageUrl !== null && typeof imageUrl !== 'string') ||
+    imageUrl === undefined ||
     typeof available !== 'boolean' ||
     validAllergens === null
   ) {
@@ -154,7 +176,7 @@ export function validateMenuItem(
       description,
       priceCents: price,
       categoryId,
-      imageUrl: imageUrl === '' ? null : imageUrl,
+      imageUrl,
       available,
       allergens: validAllergens,
     },
