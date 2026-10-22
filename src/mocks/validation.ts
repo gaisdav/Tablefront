@@ -46,7 +46,8 @@ export function validateOrder(
 
   const phone = text(customerInput.phone)
   if (phone === null || phone === '') fields['customer.phone'] = 'Phone is required'
-  else if (!PHONE_PATTERN.test(phone)) fields['customer.phone'] = 'Phone number looks invalid'
+  else if (!PHONE_PATTERN.test(phone) || phone.replace(/\D/g, '').length < 7)
+    fields['customer.phone'] = 'Phone number looks invalid'
 
   const fulfillment = input.fulfillment
   if (!isFulfillment(fulfillment)) fields.fulfillment = 'Choose pickup or delivery'

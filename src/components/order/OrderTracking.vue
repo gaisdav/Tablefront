@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { isApiError } from '@/api/errors'
 import { ordersApi } from '@/api/ordersApi'
+import BaseButton from '@/components/BaseButton.vue'
 import AsyncBoundary from '@/components/AsyncBoundary.vue'
 import OrderSummary from '@/components/checkout/OrderSummary.vue'
 import OrderStepper from '@/components/order/OrderStepper.vue'
@@ -14,12 +15,16 @@ const { orderId, pollIntervalMs = 5000 } = defineProps<{
   pollIntervalMs?: number
 }>()
 
+// A 4xx (an unknown order) will not fix itself, but "request timeout" and "too many requests" do.
+function isPermanent(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429
+}
+
 // Created once per order: the page keys this component by id, so another order gets a new poller.
 const polling = usePolling((signal) => ordersApi.getOrder(orderId, signal), {
   intervalMs: pollIntervalMs,
   shouldStop: (order) => isTerminalStatus(order.status),
-  // A 4xx (an unknown order) will not fix itself; a 5xx or a dropped connection might.
-  isFatal: (error) => isApiError(error) && error.status >= 400 && error.status < 500,
+  isFatal: (error) => isApiError(error) && isPermanent(error.status),
 })
 
 // Once there is an order on screen, a failed refresh is a notice, not a replacement for the page.
@@ -71,7 +76,11 @@ function where(order: Order): string {
         </p>
         <OrderStepper v-else :status="order.status" />
 
-        <p v-if="refreshFailed" class="order__stale" role="status">
+        <p v-if="refreshFailed && polling.isStopped.value" class="order__stale" role="status">
+          This order can no longer be refreshed. Showing the last known status.
+          <BaseButton variant="secondary" @click="polling.refresh">Try again</BaseButton>
+        </p>
+        <p v-else-if="refreshFailed" class="order__stale" role="status">
           Could not refresh the status. Showing the last known one; trying again shortly.
         </p>
         <p v-else-if="!polling.isStopped.value" class="order__live text-muted">

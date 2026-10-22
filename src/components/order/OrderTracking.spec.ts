@@ -145,6 +145,49 @@ describe('OrderTracking', () => {
     expect(wrapper.text()).not.toContain('Could not refresh')
   })
 
+  it.each([408, 429])('keeps trying after a %i, which is temporary', async (status) => {
+    const order = placeOrder()
+    let first = true
+    server.use(
+      mswHttp.get('/api/orders/:id', () => {
+        if (!first) return undefined
+        first = false
+        return HttpResponse.json({ error: { code: 'busy', message: 'Slow down' } }, { status })
+      }),
+    )
+    const wrapper = track(order.id)
+
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('Received')
+    })
+  })
+
+  it('does not promise a retry once polling has ended, and offers one', async () => {
+    const order = placeOrder()
+    const wrapper = track(order.id)
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('Received')
+    })
+
+    server.use(
+      mswHttp.get('/api/orders/:id', () =>
+        HttpResponse.json({ error: { code: 'not_found', message: 'Gone' } }, { status: 404 }),
+      ),
+    )
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('can no longer be refreshed')
+    })
+    expect(wrapper.text()).not.toContain('trying again shortly')
+
+    server.resetHandlers()
+    db.setOrderStatus(order.id, 'preparing')
+    await wrapper.get('.order__stale button').trigger('click')
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('Preparing')
+    })
+    expect(wrapper.text()).not.toContain('can no longer be refreshed')
+  })
+
   it('stops requesting when it is removed from the page', async () => {
     const order = placeOrder()
     let requests = 0

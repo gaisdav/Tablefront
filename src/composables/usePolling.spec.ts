@@ -241,6 +241,21 @@ describe('usePolling: hidden tabs', () => {
     expect(fetcher).toHaveBeenCalledTimes(2)
   })
 
+  it('refresh() requests even while the tab is hidden, because the user asked', async () => {
+    const fetcher = vi.fn().mockResolvedValue('a')
+    const { polling } = start(fetcher)
+    setHidden(true)
+    await tick(0)
+    polling.stop()
+
+    polling.refresh()
+    await tick(0)
+
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(polling.data.value).toBe('a')
+    expect(polling.isLoading.value).toBe(false)
+  })
+
   it('does not wake up a poller that has stopped', async () => {
     const fetcher = vi.fn().mockResolvedValue('done')
     start(fetcher, { shouldStop: () => true })

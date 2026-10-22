@@ -63,9 +63,10 @@ export function usePolling<T>(
     timer = setTimeout(() => void request(), wait)
   }
 
-  async function request(): Promise<void> {
+  // `force` is for the user asking: they are looking at the page, whatever `document.hidden` says.
+  async function request(force = false): Promise<void> {
     clearTimer()
-    if (isStopped.value || inFlight !== null || document.hidden) return
+    if (isStopped.value || inFlight !== null || (document.hidden && !force)) return
     const controller = new AbortController()
     inFlight = controller
 
@@ -107,7 +108,8 @@ export function usePolling<T>(
     inFlight = null
     isStopped.value = false
     failures = 0
-    void request()
+    isLoading.value = data.value === undefined
+    void request(true)
   }
 
   function onVisibilityChange(): void {

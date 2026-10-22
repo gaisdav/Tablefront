@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { isNavigationFailure, useRouter } from 'vue-router'
 import { isApiError } from '@/api/errors'
 import { ordersApi } from '@/api/ordersApi'
 import BaseButton from '@/components/BaseButton.vue'
@@ -29,6 +29,8 @@ const errors = ref<CheckoutErrors>({})
 const problems = ref<string[]>([])
 const submitting = ref(false)
 const attempted = ref(false)
+/** Set only if the order was placed but the page could not move on to it. */
+const placedOrderId = ref<string | null>(null)
 
 const formElement = useTemplateRef<HTMLFormElement>('formEl')
 const problemsElement = useTemplateRef<HTMLElement>('problemsEl')
@@ -68,8 +70,9 @@ watch(
 
 async function focusFirstProblem(): Promise<void> {
   await nextTick()
+  // The alert comes first: it holds what the user has to know before the fields make sense.
   const field = formElement.value?.querySelector<HTMLElement>('[aria-invalid="true"]')
-  ;(field ?? problemsElement.value)?.focus()
+  ;(problemsElement.value ?? field)?.focus()
 }
 
 async function submit(): Promise<void> {
@@ -86,10 +89,7 @@ async function submit(): Promise<void> {
   submitting.value = true
   try {
     const order = await ordersApi.createOrder(buildOrderRequest(form, cart.lines))
-    // `replace`, so Back from the order does not land on a checkout with an empty cart. The cart is
-    // cleared after leaving, otherwise this page would flash its empty state first.
-    await router.replace({ name: 'order', params: { id: order.id } })
-    cart.clear()
+    await openPlacedOrder(order.id)
   } catch (caught) {
     if (isApiError(caught) && caught.status === 422) {
       const mapped = mapServerErrors(caught.fieldErrors, cart.lines)
@@ -109,6 +109,24 @@ async function submit(): Promise<void> {
   }
 }
 
+/**
+ * The order exists from here on, so whatever happens next the cart is emptied: keeping it would
+ * invite a second submit and a duplicate order. `replace`, so Back from the order does not land
+ * on a checkout with an empty cart; the cart is cleared after leaving, otherwise this page would
+ * flash its empty state first. A navigation that did not happen (a guard, a newer navigation)
+ * is not an exception, it is a returned failure, so it is checked for and the user is given a link.
+ */
+async function openPlacedOrder(orderId: string): Promise<void> {
+  let moved: boolean
+  try {
+    moved = !isNavigationFailure(await router.replace({ name: 'order', params: { id: orderId } }))
+  } catch {
+    moved = false
+  }
+  if (!moved) placedOrderId.value = orderId
+  cart.clear()
+}
+
 const placeLabel = computed(() => `Place order · ${formatCents(cart.subtotalCents)}`)
 </script>
 
@@ -116,8 +134,15 @@ const placeLabel = computed(() => `Place order · ${formatCents(cart.subtotalCen
   <section class="checkout">
     <h1>Checkout</h1>
 
+    <div v-if="placedOrderId !== null" class="placed" role="status">
+      <p class="placed__title">Your order has been placed.</p>
+      <RouterLink :to="{ name: 'order', params: { id: placedOrderId } }">
+        Follow order {{ placedOrderId }}
+      </RouterLink>
+    </div>
+
     <EmptyState
-      v-if="cart.isEmpty"
+      v-else-if="cart.isEmpty"
       title="Your cart is empty"
       description="Add a few dishes from the menu, then come back to place your order."
     >
@@ -137,7 +162,7 @@ const placeLabel = computed(() => `Place order · ${formatCents(cart.subtotalCen
         >
           <p class="problems__title">We could not place your order.</p>
           <ul class="problems__list">
-            <li v-for="problem in problems" :key="problem">{{ problem }}</li>
+            <li v-for="(problem, index) in problems" :key="index">{{ problem }}</li>
           </ul>
         </div>
 
@@ -191,6 +216,18 @@ const placeLabel = computed(() => `Place order · ${formatCents(cart.subtotalCen
 .form {
   display: grid;
   gap: var(--space-4);
+}
+
+.placed {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-success-soft);
+}
+
+.placed__title {
+  font-weight: var(--weight-semibold);
 }
 
 .problems {

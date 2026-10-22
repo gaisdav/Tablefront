@@ -12,15 +12,15 @@
   - one request at a time; the wait starts when the response arrives, so a slow server never gets overlapping requests;
   - nothing is requested while the tab is hidden, and the next request goes out immediately when it is shown again;
   - after a failure the wait doubles (up to a cap) and a success resets it; the last good data stays on screen, with a notice that it could not be refreshed;
-  - it ends by itself on a terminal status (`completed`, `cancelled`) or on an error that retrying cannot fix (an unknown order, any 4xx), and when the component is unmounted (the in-flight request is aborted);
-  - `refresh()` requests now and restarts it, which is what "Try again" does.
+  - it ends by itself on a terminal status (`completed`, `cancelled`) or on an error that retrying cannot fix (an unknown order, a 4xx other than 408 and 429), and when the component is unmounted (the in-flight request is aborted);
+  - `refresh()` requests now, even in a hidden tab, and restarts it, which is what "Try again" does; once polling has ended on a page that still shows an order, the notice says so and offers it.
 
 ## Decisions worth a look
 
 - **Where logic lives.** Rules, request building and error mapping are plain functions in `src/domain/checkout.ts`, tested without a component. `CheckoutPage` only wires them to state. `OrderTracking` owns the poller, and `OrderPage` only reads the route and keys it by id, so opening another order starts a fresh poller.
 - **`usePolling` is not `useAsyncState` in a loop.** It needs different rules (a timer that depends on the previous result, pausing, back-off, stopping), so it has its own small state machine rather than bending the other composable.
 - **A refresh that fails does not replace the page.** The error boundary only takes over while there is no order to show.
-- **The cart is cleared after navigating**, otherwise the checkout page would flash its empty state first. If the navigation itself failed the cart stays, which is the safe side.
+- **The cart is cleared after navigating**, otherwise the checkout page would flash its empty state first. Once the order exists the cart is always emptied, since keeping it invites a duplicate order. If the navigation does not happen (a guard, a newer navigation; `router.replace` returns a failure rather than throwing), the page says the order was placed and links to it.
 
 ## Not done on purpose
 
@@ -35,3 +35,19 @@
 - Tests fail when their fix is removed: the submit guard, focusing the invalid field, `replace` vs `push`, clearing the cart, back-off, resetting the back-off, disposing the poller, the in-flight guard and the 4xx rule.
 - In a real browser (Chrome, 1280 px light and 375 px dark): an invalid submit shows all messages and focuses the name; a valid delivery order lands on the order page with the cart empty; no console errors.
 - The test setup now stubs `window.scrollTo` (jsdom does not implement it), which removes the "not implemented" noise.
+
+## Review follow-up
+
+Fixed:
+
+- A navigation that does not happen after the order is placed is detected (`isNavigationFailure`), and the page links to the order instead of silently staying put.
+- 408 and 429 are retried like a 5xx; only other 4xx stop polling.
+- After polling has ended on stale data the notice no longer promises a retry; it offers "Try again".
+- `refresh()` requests even while the tab is hidden and resets the loading state.
+- The problems list is keyed by index (messages can repeat).
+- When the server reports both a field and an order problem, the alert is focused first (it holds what must be known before the fields make sense).
+- A phone number needs at least 7 digits, on the client and in the mock API.
+
+Not changed:
+
+- The status announcement repeating identical text: statuses only move forward, so two identical consecutive messages cannot happen. The live region sits outside the error boundary on purpose, so it survives retries.

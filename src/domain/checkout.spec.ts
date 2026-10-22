@@ -33,12 +33,18 @@ describe('validateCheckoutForm', () => {
     expect(validateCheckoutForm({ ...valid, phone: ' ' }).phone).toBe('Phone is required')
   })
 
-  it.each(['abc', '12345', '++49 123 4567', '123456789012345678901', '030/1234567'])(
-    'rejects the phone number %j',
-    (phone) => {
-      expect(validateCheckoutForm({ ...valid, phone }).phone).toBe('Phone number looks invalid')
-    },
-  )
+  it.each([
+    'abc',
+    '12345',
+    '-------',
+    '((((((( ',
+    '+ ( ) - 1 2 3',
+    '++49 123 4567',
+    '123456789012345678901',
+    '030/1234567',
+  ])('rejects the phone number %j', (phone) => {
+    expect(validateCheckoutForm({ ...valid, phone }).phone).toBe('Phone number looks invalid')
+  })
 
   it.each(['+49 30 1234567', '030 1234567', '(030) 123-4567', ' 1234567 '])(
     'accepts the phone number %j',

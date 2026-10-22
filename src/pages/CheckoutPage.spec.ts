@@ -217,6 +217,24 @@ describe('checkout: placing the order', () => {
   })
 })
 
+describe('checkout: when the page cannot move on', () => {
+  it('empties the cart and links to the order instead of inviting a second submit', async () => {
+    const sent = countOrderRequests()
+    const { wrapper, router, cart } = await mountCheckout()
+    router.beforeEach((to) => to.name !== 'order')
+    await fillValid(wrapper)
+
+    await submit(wrapper)
+
+    const placed = await vi.waitFor(() => wrapper.get('.placed'))
+    expect(placed.text()).toContain('Your order has been placed')
+    expect(placed.get('a').attributes('href')).toMatch(/^\/orders\/ord-/)
+    expect(cart.isEmpty).toBe(true)
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(sent).toHaveLength(1)
+  })
+})
+
 describe('checkout: server errors', () => {
   function rejectWith(fields: Record<string, string>) {
     server.use(
@@ -259,6 +277,23 @@ describe('checkout: server errors', () => {
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(alert.element)
     })
+  })
+
+  it('focuses the alert when the server reports both a field and a line problem', async () => {
+    rejectWith({
+      'customer.phone': 'Phone number looks invalid',
+      'lines.0.menuItemId': 'Margherita pizza is no longer available',
+    })
+    const { wrapper } = await mountCheckout()
+    await fillValid(wrapper)
+
+    await submit(wrapper)
+
+    const alert = await vi.waitFor(() => wrapper.get('.problems'))
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(alert.element)
+    })
+    expect(errorTexts(wrapper)).toEqual(['Phone number looks invalid'])
   })
 
   it('lets the user correct a server error and send again', async () => {

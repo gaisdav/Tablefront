@@ -15,6 +15,12 @@ export type CheckoutErrors = Partial<Record<CheckoutField, string>>
 // The same rules the API applies, so most mistakes are caught before a request is made. The server
 // stays the authority: whatever it still rejects comes back as 422 and is mapped by `mapServerErrors`.
 const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/
+const MIN_PHONE_DIGITS = 7
+
+/** The characters allowed, and enough actual digits that "-------" does not pass. */
+function isPlausiblePhone(phone: string): boolean {
+  return PHONE_PATTERN.test(phone) && phone.replace(/\D/g, '').length >= MIN_PHONE_DIGITS
+}
 
 export function validateCheckoutForm(form: CheckoutForm): CheckoutErrors {
   const errors: CheckoutErrors = {}
@@ -23,7 +29,7 @@ export function validateCheckoutForm(form: CheckoutForm): CheckoutErrors {
 
   const phone = form.phone.trim()
   if (phone === '') errors.phone = 'Phone is required'
-  else if (!PHONE_PATTERN.test(phone)) errors.phone = 'Phone number looks invalid'
+  else if (!isPlausiblePhone(phone)) errors.phone = 'Phone number looks invalid'
 
   if (form.fulfillment === 'delivery' && form.address.trim() === '') {
     errors.address = 'Address is required for delivery'
