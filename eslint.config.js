@@ -6,7 +6,14 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'local-docs', 'public/mockServiceWorker.js']),
+  globalIgnores([
+    'dist',
+    'coverage',
+    'test-results',
+    'playwright-report',
+    'local-docs',
+    'public/mockServiceWorker.js',
+  ]),
 
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,

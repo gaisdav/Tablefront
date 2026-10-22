@@ -9,3 +9,7 @@ coverage
 
 # Private working notes (specs, plans), not part of the repo
 /local-docs/
+
+# Playwright output
+/test-results/
+/playwright-report/

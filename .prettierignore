@@ -3,3 +3,5 @@ coverage
 pnpm-lock.yaml
 local-docs
 public/mockServiceWorker.js
+test-results
+playwright-report
