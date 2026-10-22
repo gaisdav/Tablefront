@@ -5,11 +5,13 @@ import {
   createSeedOrders,
   menuItems,
 } from '@/mocks/fixtures'
+import { loadSavedDb, saveDb } from '@/mocks/dbStorage'
 import type { MenuItemInput } from '@/types/api'
 import type { Category, MenuItem, Order, OrderStatus } from '@/types/domain'
 
-// In-memory store. Everything lives in module state, so a page reload (or `resetDb` in tests)
-// starts again from the fixtures.
+// In-memory store. Everything lives in module state, so by default a page reload (or `resetDb` in
+// tests) starts again from the fixtures. The browser build turns on persistence, which keeps what
+// the demo changes (orders and the menu) in localStorage across reloads; tests never do.
 interface State {
   categories: Category[]
   menuItems: MenuItem[]
@@ -30,8 +32,30 @@ function createState(): State {
 
 let state = createState()
 
+let persistent = false
+
+function persist(): void {
+  if (persistent) saveDb(state)
+}
+
+/**
+ * Keeps the database across page reloads: starts from what was saved (if it is readable) and saves
+ * after every change from now on. Used by the browser build only.
+ */
+export function enableDbPersistence(): void {
+  persistent = true
+  const saved = loadSavedDb()
+  if (saved !== null) state = { ...state, ...saved }
+}
+
+export function disableDbPersistence(): void {
+  persistent = false
+}
+
+/** Back to the fixtures; with persistence on, the saved copy is replaced too ("reset demo data"). */
 export function resetDb(): void {
   state = createState()
+  persist()
 }
 
 export interface MenuItemFilter {
@@ -75,6 +99,7 @@ export const db = {
     const item: MenuItem = { id: `item-${String(state.nextMenuItemNumber)}`, ...input }
     state.nextMenuItemNumber += 1
     state.menuItems.push(item)
+    persist()
     return item
   },
 
@@ -83,6 +108,7 @@ export const db = {
     if (index === -1) return undefined
     const item: MenuItem = { id, ...input }
     state.menuItems[index] = item
+    persist()
     return item
   },
 
@@ -90,6 +116,7 @@ export const db = {
     const index = state.menuItems.findIndex((item) => item.id === id)
     if (index === -1) return false
     state.menuItems.splice(index, 1)
+    persist()
     return true
   },
 
@@ -115,6 +142,7 @@ export const db = {
     }
     state.nextOrderNumber += 1
     state.orders.push(order)
+    persist()
     return order
   },
 
@@ -122,6 +150,7 @@ export const db = {
     const order = state.orders.find((candidate) => candidate.id === id)
     if (order === undefined) return undefined
     order.status = status
+    persist()
     return order
   },
 }

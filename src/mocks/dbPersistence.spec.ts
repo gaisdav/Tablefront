@@ -1,0 +1,243 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { isRecord } from '@/domain/guards'
+import { menuItems } from '@/mocks/fixtures'
+import type { MenuItemInput } from '@/types/api'
+
+// jsdom is not a browser, so the service worker cannot be set up; the entry point is imported only
+// to see what it switches on.
+vi.mock('msw/browser', () => ({ setupWorker: () => ({}) }))
+
+const KEY = 'tablefront:mock-db'
+
+/** A page load: the module is evaluated again, so its in-memory state starts from scratch. */
+async function pageLoad() {
+  vi.resetModules()
+  return import('@/mocks/db')
+}
+
+async function persistentPageLoad() {
+  const module = await pageLoad()
+  module.enableDbPersistence()
+  return module.db
+}
+
+const dish = menuItems.find((item) => item.available)
+if (dish === undefined) throw new Error('no dish')
+
+const orderInput = {
+  lines: [{ menuItemId: dish.id, name: dish.name, unitPriceCents: dish.priceCents, quantity: 2 }],
+  fulfillment: 'pickup' as const,
+  customer: { name: 'Anna', phone: '+49 30 1234567' },
+}
+
+const itemInput: MenuItemInput = {
+  name: 'Apfelstrudel',
+  description: 'Warm, with vanilla sauce.',
+  priceCents: 650,
+  categoryId: 'cat-desserts',
+  imageUrl: null,
+  available: true,
+  allergens: ['gluten'],
+}
+
+type Json = Record<string, unknown>
+
+/** The saved database as plain JSON, for tests that damage it on purpose. */
+interface Raw extends Json {
+  menuItems: Json[]
+  orders: Json[]
+}
+
+function readRaw(): Raw {
+  const value: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null')
+  if (!isRecord(value) || !Array.isArray(value.menuItems) || !Array.isArray(value.orders)) {
+    throw new Error('nothing saved')
+  }
+  return {
+    ...value,
+    menuItems: value.menuItems.filter(isRecord),
+    orders: value.orders.filter(isRecord),
+  }
+}
+
+function first(list: Json[]): Json {
+  const [item] = list
+  if (item === undefined) throw new Error('empty')
+  return item
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('a persistent mock database', () => {
+  it('writes nothing unless persistence is switched on', async () => {
+    const { db } = await pageLoad()
+
+    db.createOrder(orderInput)
+
+    expect(localStorage.getItem(KEY)).toBeNull()
+  })
+
+  it('starts from the fixtures when nothing was saved', async () => {
+    const db = await persistentPageLoad()
+
+    expect(db.listMenuItems({ includeUnavailable: true })).toHaveLength(menuItems.length)
+    expect(db.getOrder('ord-1008')).toBeUndefined()
+  })
+
+  it('keeps an order across a reload, and keeps numbering from where it was', async () => {
+    const before = await persistentPageLoad()
+    const order = before.createOrder(orderInput)
+
+    const after = await persistentPageLoad()
+
+    expect(after.getOrder(order.id)).toEqual(order)
+    expect(after.createOrder(orderInput).id).not.toBe(order.id)
+  })
+
+  it('keeps a status change', async () => {
+    const before = await persistentPageLoad()
+    const order = before.createOrder(orderInput)
+    before.setOrderStatus(order.id, 'preparing')
+
+    expect((await persistentPageLoad()).getOrder(order.id)?.status).toBe('preparing')
+  })
+
+  it('keeps menu edits: create, replace and delete', async () => {
+    const before = await persistentPageLoad()
+    const created = before.createMenuItem(itemInput)
+    before.replaceMenuItem(dish.id, { ...itemInput, name: 'Renamed' })
+    before.deleteMenuItem(menuItems[1]?.id ?? '')
+
+    const after = await persistentPageLoad()
+
+    expect(after.getMenuItem(created.id)?.name).toBe('Apfelstrudel')
+    expect(after.getMenuItem(dish.id)?.name).toBe('Renamed')
+    expect(after.getMenuItem(menuItems[1]?.id ?? '')).toBeUndefined()
+    expect(after.createMenuItem(itemInput).id).not.toBe(created.id)
+  })
+
+  it('goes back to the fixtures on reset, and saves that too', async () => {
+    const module = await pageLoad()
+    module.enableDbPersistence()
+    const order = module.db.createOrder(orderInput)
+
+    module.resetDb()
+
+    expect(module.db.getOrder(order.id)).toBeUndefined()
+    expect((await persistentPageLoad()).getOrder(order.id)).toBeUndefined()
+  })
+
+  it('stops saving when persistence is switched off again', async () => {
+    const module = await pageLoad()
+    module.enableDbPersistence()
+    module.disableDbPersistence()
+
+    module.db.createOrder(orderInput)
+
+    expect(localStorage.getItem(KEY)).toBeNull()
+  })
+})
+
+describe('a saved database that cannot be trusted', () => {
+  async function savedWith(change: (raw: Raw) => void) {
+    const before = await persistentPageLoad()
+    const order = before.createOrder(orderInput)
+    const raw = readRaw()
+    change(raw)
+    localStorage.setItem(KEY, JSON.stringify(raw))
+    const after = await persistentPageLoad()
+    return { after, order }
+  }
+
+  it.each([
+    ['text that is not JSON', '{not json'],
+    ['an empty string', ''],
+    ['JSON null', 'null'],
+    ['an array', '[]'],
+    ['no version', JSON.stringify({ menuItems: [], orders: [] })],
+  ])('starts from the fixtures for %s', async (_label, raw) => {
+    localStorage.setItem(KEY, raw)
+
+    const db = await persistentPageLoad()
+
+    expect(db.listMenuItems({ includeUnavailable: true })).toHaveLength(menuItems.length)
+  })
+
+  const damage: [string, (raw: Raw) => void][] = [
+    ['another version', (raw) => (raw.version = 2)],
+    ['a version stored as text', (raw) => (raw.version = '1')],
+    ['a bad counter', (raw) => (raw.nextOrderNumber = 0)],
+    ['a fractional total', (raw) => (first(raw.orders).totalCents = 1.5)],
+    ['an unknown status', (raw) => (first(raw.orders).status = 'lost')],
+    ['an order without lines', (raw) => (first(raw.orders).lines = [])],
+    ['an unreadable date', (raw) => (first(raw.orders).createdAt = 'soon')],
+    ['a customer without a phone', (raw) => (first(raw.orders).customer = { name: 'A' })],
+    [
+      'a line with a bad quantity',
+      (raw) =>
+        (first(raw.orders).lines = [
+          { menuItemId: 'x', name: 'x', unitPriceCents: 100, quantity: 0 },
+        ]),
+    ],
+    ['a duplicate order id', (raw) => raw.orders.push({ ...first(raw.orders) })],
+    [
+      'a menu item with an unknown allergen',
+      (raw) => (first(raw.menuItems).allergens = ['pollen']),
+    ],
+  ]
+
+  it.each(damage)(
+    'drops the whole database, not just the record, for %s',
+    async (_label, change) => {
+      const { after, order } = await savedWith(change)
+
+      expect(after.getOrder(order.id)).toBeUndefined()
+      expect(after.listMenuItems({ includeUnavailable: true })).toHaveLength(menuItems.length)
+    },
+  )
+
+  it('also drops orders that are not an array', async () => {
+    const before = await persistentPageLoad()
+    const order = before.createOrder(orderInput)
+    localStorage.setItem(KEY, JSON.stringify({ ...readRaw(), orders: {} }))
+
+    const after = await persistentPageLoad()
+
+    expect(after.getOrder(order.id)).toBeUndefined()
+  })
+
+  it('starts from the fixtures when storage cannot be read', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+
+    const db = await persistentPageLoad()
+
+    expect(db.listMenuItems({ includeUnavailable: true })).toHaveLength(menuItems.length)
+  })
+
+  it('keeps working in memory when storage cannot be written', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    const db = await persistentPageLoad()
+
+    const order = db.createOrder(orderInput)
+
+    expect(db.getOrder(order.id)).toEqual(order)
+  })
+})
+
+describe('the browser entry point', () => {
+  it('turns persistence on, so orders survive a refresh of the demo', async () => {
+    vi.resetModules()
+    const { db } = await import('@/mocks/db')
+    await import('@/mocks/browser')
+
+    const order = db.createOrder(orderInput)
+
+    expect(localStorage.getItem(KEY)).toContain(order.id)
+  })
+})
