@@ -86,7 +86,7 @@ describe('the menu page: the list', () => {
 
     expect(rowNames(wrapper)).toHaveLength(menuItems.length)
     expect(rowNames(wrapper)).toContain(soldOut.name)
-    expect(wrapper.get('[role="status"]').text()).toBe(
+    expect(wrapper.get('main [role="status"]').text()).toBe(
       `${String(menuItems.length)} of ${String(menuItems.length)} dishes`,
     )
   })
