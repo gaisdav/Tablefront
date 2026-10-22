@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError, isAbortError } from '@/api/errors'
 import { createHttpClient, type HttpClientConfig } from '@/api/http'
 import { server } from '@/mocks/server'
+import { rejection } from '@/test/helpers'
 
 function makeClient(overrides: Partial<HttpClientConfig> = {}) {
   const onUnauthorized = vi.fn()
@@ -17,16 +18,6 @@ function makeClient(overrides: Partial<HttpClientConfig> = {}) {
 
 function errorBody(code: string, message: string, fields?: Record<string, string>) {
   return { error: { code, message, ...(fields === undefined ? {} : { fields }) } }
-}
-
-/** Runs the promise and returns the rejection, failing the test if it resolves. */
-async function rejection(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise
-  } catch (error) {
-    return error
-  }
-  throw new Error('Expected the promise to reject')
 }
 
 describe('http client: success', () => {
