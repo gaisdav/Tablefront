@@ -1,0 +1,92 @@
+<script setup lang="ts">
+import { computed, useId } from 'vue'
+
+// Attributes such as `name`, `autocomplete`, `required` or `placeholder` belong on the <input>,
+// not on the wrapper.
+defineOptions({ inheritAttrs: false })
+
+const model = defineModel<string>({ required: true })
+
+const {
+  label,
+  type = 'text',
+  hint,
+  error,
+} = defineProps<{
+  /** Always visible: a placeholder is not a label. */
+  label: string
+  type?: 'text' | 'email' | 'password' | 'tel' | 'search' | 'number' | 'url'
+  hint?: string
+  /** Shown under the field and announced with it; also marks the field invalid. */
+  error?: string
+}>()
+
+const id = useId()
+const hintId = `${id}-hint`
+const errorId = `${id}-error`
+
+const describedBy = computed(() => {
+  const ids = [hint ? hintId : null, error ? errorId : null].filter((value) => value !== null)
+  return ids.length > 0 ? ids.join(' ') : undefined
+})
+</script>
+
+<template>
+  <div class="field">
+    <label class="field__label" :for="id">{{ label }}</label>
+    <input
+      :id="id"
+      v-bind="$attrs"
+      v-model="model"
+      class="field__input"
+      :type="type"
+      :aria-invalid="error ? true : undefined"
+      :aria-describedby="describedBy"
+    />
+    <p v-if="hint" :id="hintId" class="field__hint">{{ hint }}</p>
+    <p v-if="error" :id="errorId" class="field__error">{{ error }}</p>
+  </div>
+</template>
+
+<style scoped>
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.field__input {
+  min-height: var(--tap-size);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.field__input:hover {
+  border-color: var(--color-text-muted);
+}
+
+.field__input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.field__hint,
+.field__error {
+  font-size: var(--text-sm);
+}
+
+.field__hint {
+  color: var(--color-text-muted);
+}
+
+.field__error {
+  color: var(--color-danger);
+}
+</style>
