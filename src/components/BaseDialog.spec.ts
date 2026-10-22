@@ -50,7 +50,7 @@ afterEach(() => {
   for (const wrapper of mounted.splice(0)) wrapper.unmount()
   opener?.remove()
   opener = null
-  document.body.style.overflow = ''
+  document.body.classList.remove('scroll-locked')
 })
 
 describe('BaseDialog', () => {
@@ -125,6 +125,53 @@ describe('BaseDialog focus trap', () => {
     expect(document.activeElement).toBe(document.querySelector('[aria-label="Close dialog"]'))
   })
 
+  it('pulls focus back in when Tab is pressed while focus is on the page body', () => {
+    openDialog()
+    byId('name').focus()
+    byId('name').blur()
+
+    const event = press('Tab')
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(document.querySelector('[aria-label="Close dialog"]'))
+  })
+
+  it('skips hidden and negatively tabbable elements when wrapping', () => {
+    openDialog(
+      {},
+      {
+        default: () => [
+          h('button', { id: 'save' }, 'Save'),
+          h('button', { id: 'hidden-button', hidden: true }, 'Hidden'),
+          h('input', { type: 'hidden' }),
+          h('button', { id: 'skipped', tabindex: -2 }, 'Skipped'),
+        ],
+        footer: () => [],
+      },
+    )
+    byId('save').focus()
+
+    press('Tab')
+    expect(document.activeElement).toBe(document.querySelector('[aria-label="Close dialog"]'))
+
+    press('Tab', { shiftKey: true })
+    expect(document.activeElement).toBe(byId('save'))
+  })
+
+  it('keeps the original opener when the dialog is closed and reopened', async () => {
+    const wrapper = openDialog()
+    byId('save').focus()
+
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(byId('name'))
+    })
+    await wrapper.setProps({ open: false })
+
+    expect(document.activeElement).toBe(opener)
+  })
+
   it('keeps focus on the dialog when there is nothing to tab to', () => {
     openDialog({}, { default: () => h('p', 'Saved.'), footer: () => [] })
     const close = document.querySelector<HTMLButtonElement>('[aria-label="Close dialog"]')
@@ -166,16 +213,33 @@ describe('BaseDialog dismissing', () => {
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
 
-  it('does not let Escape reach handlers outside the dialog', () => {
-    const outside = vi.fn()
-    document.body.addEventListener('keydown', outside)
-    openDialog()
+  it('closes on Escape even when focus has fallen to the page', () => {
+    const wrapper = openDialog()
     byId('name').focus()
+    byId('name').blur()
+    expect(document.activeElement).toBe(document.body)
 
     press('Escape')
 
-    expect(outside).not.toHaveBeenCalled()
-    document.body.removeEventListener('keydown', outside)
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+  })
+
+  it('closes only the topmost of two stacked dialogs on Escape', () => {
+    const below = openDialog()
+    const above = openDialog()
+
+    press('Escape')
+
+    expect(above.emitted('update:open')).toEqual([[false]])
+    expect(below.emitted('update:open')).toBeUndefined()
+  })
+
+  it('ignores Escape while the user is composing text with an IME', () => {
+    const wrapper = openDialog()
+
+    press('Escape', { isComposing: true })
+
+    expect(wrapper.emitted('update:open')).toBeUndefined()
   })
 
   it('closes from the close button', () => {
@@ -186,27 +250,71 @@ describe('BaseDialog dismissing', () => {
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
 
-  it('closes when the backdrop is pressed, but not when the panel is', () => {
-    const wrapper = openDialog()
+  describe('backdrop', () => {
+    function mouse(target: Element | null | undefined, type: 'mousedown' | 'mouseup') {
+      target?.dispatchEvent(new MouseEvent(type, { bubbles: true }))
+    }
 
-    dialog()?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    expect(wrapper.emitted('update:open')).toBeUndefined()
+    it('closes when a press starts and ends on the backdrop', () => {
+      const wrapper = openDialog()
+      const backdrop = dialog()?.parentElement
 
-    dialog()?.parentElement?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    expect(wrapper.emitted('update:open')).toEqual([[false]])
+      mouse(backdrop, 'mousedown')
+      mouse(backdrop, 'mouseup')
+
+      expect(wrapper.emitted('update:open')).toEqual([[false]])
+    })
+
+    it('stays open when the press is inside the panel', () => {
+      const wrapper = openDialog()
+
+      mouse(dialog(), 'mousedown')
+      mouse(dialog(), 'mouseup')
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    })
+
+    it('stays open when a press starts in the panel and ends on the backdrop (a text selection drag)', () => {
+      const wrapper = openDialog()
+
+      mouse(dialog(), 'mousedown')
+      mouse(dialog()?.parentElement, 'mouseup')
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    })
+
+    it('stays open when a press starts on the backdrop and ends in the panel', () => {
+      const wrapper = openDialog()
+
+      mouse(dialog()?.parentElement, 'mousedown')
+      mouse(dialog(), 'mouseup')
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    })
+
+    it('forgets an unfinished press, so a later stray mouseup does not close it', () => {
+      const wrapper = openDialog()
+      const backdrop = dialog()?.parentElement
+
+      mouse(backdrop, 'mousedown')
+      mouse(dialog(), 'mouseup')
+      mouse(backdrop, 'mouseup')
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    })
   })
 })
 
 describe('BaseDialog scroll lock', () => {
-  it('locks page scrolling while open and restores it when closed', async () => {
-    document.body.style.overflow = 'auto'
-    const wrapper = openDialog()
+  const locked = () => document.body.classList.contains('scroll-locked')
 
-    expect(document.body.style.overflow).toBe('hidden')
+  it('locks page scrolling while open and releases it when closed', async () => {
+    const wrapper = openDialog()
+    expect(locked()).toBe(true)
 
     await wrapper.setProps({ open: false })
 
-    expect(document.body.style.overflow).toBe('auto')
+    expect(locked()).toBe(false)
   })
 
   it('keeps the page locked until every open dialog has closed', async () => {
@@ -214,9 +322,20 @@ describe('BaseDialog scroll lock', () => {
     const second = openDialog()
 
     await first.setProps({ open: false })
-    expect(document.body.style.overflow).toBe('hidden')
+    expect(locked()).toBe(true)
 
     await second.setProps({ open: false })
-    expect(document.body.style.overflow).toBe('')
+    expect(locked()).toBe(false)
+  })
+
+  it('does not touch an overflow style that other code set', async () => {
+    document.body.style.overflow = 'scroll'
+    const wrapper = openDialog()
+    document.body.style.overflow = 'clip'
+
+    await wrapper.setProps({ open: false })
+
+    expect(document.body.style.overflow).toBe('clip')
+    document.body.style.overflow = ''
   })
 })

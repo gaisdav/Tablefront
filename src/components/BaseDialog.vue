@@ -17,33 +17,42 @@ const titleId = useId()
 const panel = ref<HTMLElement | null>(null)
 const content = ref<HTMLElement | null>(null)
 
-// Focus starts on the first control in the content (a form field, a Cancel button) rather than
-// on the close button that comes first in the DOM.
-const { onKeydown: trapTab } = useFocusTrap(open, panel, {
-  initialFocus: () => (content.value === null ? undefined : getFocusable(content.value)[0]),
-})
-useScrollLock(open)
-
 function close(): void {
   open.value = false
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    // Only the dialog that has focus closes, even if another one is open underneath.
-    event.stopPropagation()
-    close()
-    return
-  }
-  trapTab(event)
+// Focus starts on the first control in the content (a form field, a Cancel button) rather than
+// on the close button that comes first in the DOM.
+useFocusTrap(open, panel, {
+  initialFocus: () => (content.value === null ? undefined : getFocusable(content.value)[0]),
+  onEscape: close,
+})
+useScrollLock(open)
+
+// A press only dismisses the dialog if it both starts and ends on the backdrop. Dragging a text
+// selection out of a field, or a press that begins on the backdrop and ends in the panel, must not.
+let pressStartedOnBackdrop = false
+
+function onBackdropMousedown(event: MouseEvent): void {
+  pressStartedOnBackdrop = event.target === event.currentTarget
+}
+
+function onBackdropMouseup(event: MouseEvent): void {
+  const completed = pressStartedOnBackdrop && event.target === event.currentTarget
+  pressStartedOnBackdrop = false
+  if (completed) close()
 }
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="dialog">
-      <!-- mousedown, not click: dragging a text selection out of a field must not dismiss it. -->
-      <div v-if="open" class="backdrop" @mousedown.self="close">
+      <div
+        v-if="open"
+        class="backdrop"
+        @mousedown="onBackdropMousedown"
+        @mouseup="onBackdropMouseup"
+      >
         <div
           ref="panel"
           class="panel"
@@ -51,7 +60,6 @@ function onKeydown(event: KeyboardEvent): void {
           aria-modal="true"
           :aria-labelledby="titleId"
           tabindex="-1"
-          @keydown="onKeydown"
         >
           <header class="panel__header">
             <h2 :id="titleId" class="panel__title">{{ title }}</h2>

@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { h } from 'vue'
 import { describe, expect, it } from 'vitest'
+import { ApiError } from '@/api/errors'
 import AsyncBoundary from '@/components/AsyncBoundary.vue'
 
 const items = ['Margherita', 'Carbonara']
@@ -18,6 +19,7 @@ function mountBoundary(
     error?: Error | null
     isLoading?: boolean
     isEmpty?: (data: string[]) => boolean
+    errorMessage?: (error: Error) => string
   },
   slots: Record<string, unknown> = {},
 ) {
@@ -37,10 +39,13 @@ describe('AsyncBoundary: loading', () => {
     expect(wrapper.attributes('aria-busy')).toBe('true')
   })
 
-  it('also shows the skeleton before the first run has started', () => {
+  it('shows nothing while idle: not started, or cancelled, with nothing to show', () => {
     const wrapper = mountBoundary({})
 
-    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(wrapper.find('.skeleton').exists()).toBe(false)
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('li').exists()).toBe(false)
   })
 
   it('hides the decorative skeleton from assistive technology', () => {
@@ -62,7 +67,13 @@ describe('AsyncBoundary: loading', () => {
 
 describe('AsyncBoundary: error', () => {
   it('shows the message as an alert with a retry button', async () => {
-    const wrapper = mountBoundary({ error: new Error('Network error. Check your connection.') })
+    const wrapper = mountBoundary({
+      error: new ApiError({
+        status: 0,
+        code: 'network_error',
+        message: 'Network error. Check your connection.',
+      }),
+    })
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Network error. Check your connection.')
     expect(wrapper.find('li').exists()).toBe(false)
@@ -70,6 +81,21 @@ describe('AsyncBoundary: error', () => {
     await wrapper.get('button').trigger('click')
 
     expect(wrapper.emitted('retry')).toHaveLength(1)
+  })
+
+  it('hides technical messages from unexpected errors', () => {
+    const wrapper = mountBoundary({
+      error: new TypeError("Cannot read properties of undefined (reading 'id')"),
+    })
+
+    expect(wrapper.text()).not.toContain('Cannot read properties')
+    expect(wrapper.get('[role="alert"]').text()).toContain('An unexpected problem occurred')
+  })
+
+  it('lets the page choose the wording', () => {
+    const wrapper = mountBoundary({ error: new Error('x'), errorMessage: () => 'Order not found.' })
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Order not found.')
   })
 
   it('wins over data that is still around from an earlier run', () => {
