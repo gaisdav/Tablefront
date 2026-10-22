@@ -18,7 +18,7 @@ import AppBrand from '@/components/AppBrand.vue'
       <RouterLink :to="{ name: 'menu' }" class="nav-link sidebar__back">Back to site</RouterLink>
     </aside>
 
-    <main id="main" class="admin__main">
+    <main id="main" class="admin__main" tabindex="-1">
       <RouterView />
     </main>
   </div>

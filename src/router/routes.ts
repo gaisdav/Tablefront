@@ -18,6 +18,12 @@ export const routes: RouteRecordRaw[] = [
       { path: '', name: 'menu', component: () => import('@/pages/MenuPage.vue') },
       { path: 'checkout', name: 'checkout', component: () => import('@/pages/CheckoutPage.vue') },
       { path: 'orders/:id', name: 'order', component: () => import('@/pages/OrderPage.vue') },
+      // Last child, so the guest layout stays mounted when navigating to an unknown address.
+      {
+        path: ':pathMatch(.*)*',
+        name: 'not-found',
+        component: () => import('@/pages/NotFoundPage.vue'),
+      },
     ],
   },
   {
@@ -42,13 +48,6 @@ export const routes: RouteRecordRaw[] = [
         name: 'admin-menu',
         component: () => import('@/pages/admin/AdminMenuPage.vue'),
       },
-    ],
-  },
-  {
-    path: '/:pathMatch(.*)*',
-    component: GuestLayout,
-    children: [
-      { path: '', name: 'not-found', component: () => import('@/pages/NotFoundPage.vue') },
     ],
   },
 ]

@@ -16,7 +16,7 @@ import AppBrand from '@/components/AppBrand.vue'
       </div>
     </header>
 
-    <main id="main" class="container main">
+    <main id="main" class="container main" tabindex="-1">
       <RouterView />
     </main>
 

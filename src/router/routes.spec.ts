@@ -42,6 +42,13 @@ describe('routes', () => {
     }
   })
 
+  it('renders the 404 page inside the same layout record as the guest pages', () => {
+    const router = makeRouter()
+
+    // One shared parent record means the layout stays mounted when moving between them.
+    expect(router.resolve('/nope').matched[0]).toBe(router.resolve('/').matched[0])
+  })
+
   it('redirects /admin to the orders board', async () => {
     const router = makeRouter()
 
