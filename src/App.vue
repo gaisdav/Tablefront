@@ -1,12 +1,7 @@
 <script setup lang="ts">
-defineProps<{
-  title?: string
-}>()
+import { RouterView } from 'vue-router'
 </script>
 
 <template>
-  <main>
-    <h1>{{ title ?? 'Tablefront' }}</h1>
-    <p>Restaurant online ordering demo.</p>
-  </main>
+  <RouterView />
 </template>
