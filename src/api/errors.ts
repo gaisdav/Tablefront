@@ -1,3 +1,5 @@
+import { isRecord } from '@/domain/guards'
+
 /** `status` is 0 for failures that never produced an HTTP response (network, timeout). */
 export class ApiError extends Error {
   readonly status: number
@@ -21,10 +23,6 @@ export class ApiError extends Error {
 
 export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
 }
 
 /**

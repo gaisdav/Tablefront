@@ -7,8 +7,17 @@ export interface Category {
   sortOrder: number
 }
 
-export type Allergen =
-  'gluten' | 'dairy' | 'nuts' | 'eggs' | 'soy' | 'fish' | 'shellfish' | 'sesame'
+export const ALLERGENS = [
+  'gluten',
+  'dairy',
+  'nuts',
+  'eggs',
+  'soy',
+  'fish',
+  'shellfish',
+  'sesame',
+] as const
+export type Allergen = (typeof ALLERGENS)[number]
 
 export interface MenuItem {
   id: string
@@ -21,8 +30,11 @@ export interface MenuItem {
   allergens: Allergen[]
 }
 
-export type OrderStatus = 'new' | 'preparing' | 'ready' | 'completed' | 'cancelled'
-export type Fulfillment = 'pickup' | 'delivery'
+export const ORDER_STATUSES = ['new', 'preparing', 'ready', 'completed', 'cancelled'] as const
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
+
+export const FULFILLMENTS = ['pickup', 'delivery'] as const
+export type Fulfillment = (typeof FULFILLMENTS)[number]
 
 /** Name and price are snapshots taken when the order was placed. */
 export interface OrderLine {
