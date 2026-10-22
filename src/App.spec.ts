@@ -36,6 +36,7 @@ describe('guest shell', () => {
 
 describe('admin shell', () => {
   it('renders admin pages with the admin navigation, not the guest one', async () => {
+    sessionStorage.setItem('tablefront:admin-token', 'mock-admin-token')
     const wrapper = await mountAt('/admin/orders')
 
     const links = wrapper.findAll('nav[aria-label="Admin"] a')

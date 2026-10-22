@@ -22,3 +22,8 @@ export async function signInAsAdmin(): Promise<void> {
 export function signOut(): void {
   bindSession({ getToken: () => null, onUnauthorized: () => undefined })
 }
+
+/** An already signed-in staff session, the way a reload of the tab would find it. */
+export function startStaffSession(): void {
+  sessionStorage.setItem('tablefront:admin-token', 'mock-admin-token')
+}
