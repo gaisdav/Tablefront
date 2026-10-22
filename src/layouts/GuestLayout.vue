@@ -2,6 +2,9 @@
 import { RouterLink, RouterView } from 'vue-router'
 import AppBrand from '@/components/AppBrand.vue'
 import CartHost from '@/layouts/CartHost.vue'
+import { useMyOrdersStore } from '@/stores/myOrders'
+
+const myOrders = useMyOrdersStore()
 </script>
 
 <template>
@@ -14,6 +17,10 @@ import CartHost from '@/layouts/CartHost.vue'
         <div class="header__actions">
           <nav aria-label="Main">
             <RouterLink :to="{ name: 'menu' }" class="nav-link">Menu</RouterLink>
+            <!-- Only once there is something to show; until then it would just be an empty page. -->
+            <RouterLink v-if="!myOrders.isEmpty" :to="{ name: 'orders' }" class="nav-link">
+              Orders
+            </RouterLink>
           </nav>
           <CartHost />
         </div>
@@ -60,6 +67,10 @@ import CartHost from '@/layouts/CartHost.vue'
   display: flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+nav {
+  display: flex;
 }
 
 .nav-link {

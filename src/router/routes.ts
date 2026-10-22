@@ -17,6 +17,7 @@ export const routes: RouteRecordRaw[] = [
     children: [
       { path: '', name: 'menu', component: () => import('@/pages/MenuPage.vue') },
       { path: 'checkout', name: 'checkout', component: () => import('@/pages/CheckoutPage.vue') },
+      { path: 'orders', name: 'orders', component: () => import('@/pages/MyOrdersPage.vue') },
       { path: 'orders/:id', name: 'order', component: () => import('@/pages/OrderPage.vue') },
       // Last child, so the guest layout stays mounted when navigating to an unknown address.
       {
