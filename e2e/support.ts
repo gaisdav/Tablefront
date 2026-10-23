@@ -1,4 +1,10 @@
-import { expect, test as base, type Locator, type Page } from '@playwright/test'
+import {
+  expect,
+  test as base,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from '@playwright/test'
 
 export const ADMIN = { email: 'admin@tablefront.test', password: 'admin123' }
 
@@ -97,4 +103,36 @@ export async function goToCheckout(page: Page, dish = 'Bruschetta') {
   await page.getByRole('button', { name: /^Cart, 1 item/ }).click()
   await page.getByRole('button', { name: 'Go to checkout' }).click()
   await expect(page.getByRole('heading', { name: 'Checkout', level: 1 })).toBeVisible()
+}
+
+/** Fills the checkout form and sends it; returns the new order's number. */
+export async function placeOrder(
+  page: Page,
+  how: { delivery: boolean } = { delivery: false },
+): Promise<string> {
+  if (how.delivery) await page.getByRole('radio', { name: /Delivery/ }).check()
+  await page.getByLabel('Name').fill('Anna Becker')
+  await page.getByLabel('Phone').fill('+49 30 1234567')
+  if (how.delivery) await page.getByLabel('Delivery address').fill('Hauptstr. 1, 10115 Berlin')
+  await page.getByRole('button', { name: /^Place order/ }).click()
+  await expect(page).toHaveURL(/\/orders\/ord-\d+$/)
+  const id = /ord-\d+/.exec(page.url())?.[0]
+  if (id === undefined) throw new Error('no order id in the address')
+  return id
+}
+
+/** Staff in another tab of the same browser (the demo database is shared), with the order open. */
+export async function staffOpens(context: BrowserContext, id: string): Promise<Page> {
+  const staff = await context.newPage()
+  await staff.goto('/')
+  await new DevTools(staff).configure({ latency: 'None' })
+  await signIn(staff)
+  await staff.getByRole('button', { name: new RegExp(id) }).click()
+  return staff
+}
+
+/** Presses a status button and waits for the toast that says it was saved. */
+export async function pressStatus(staff: Page, id: string, button: string, now: string) {
+  await staff.getByRole('button', { name: button }).click()
+  await expect(staff.getByText(`Order ${id} is now ${now}.`)).toBeVisible()
 }

@@ -30,7 +30,14 @@ export interface MenuItem {
   allergens: Allergen[]
 }
 
-export const ORDER_STATUSES = ['new', 'preparing', 'ready', 'completed', 'cancelled'] as const
+export const ORDER_STATUSES = [
+  'new',
+  'preparing',
+  'ready',
+  'out_for_delivery',
+  'completed',
+  'cancelled',
+] as const
 export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
 export const FULFILLMENTS = ['pickup', 'delivery'] as const

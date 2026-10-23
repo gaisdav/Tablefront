@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { isApiError } from '@/api/errors'
 import { ordersApi } from '@/api/ordersApi'
+import { NEXT_ORDER_NUMBER } from '@/mocks/fixtures'
 import { rejection } from '@/test/helpers'
 import type { CreateOrderRequest } from '@/types/api'
 
@@ -139,7 +140,8 @@ describe('ordersApi.createOrder', () => {
   it('does not create an order when validation fails', async () => {
     await fieldErrorsFor(pickupOrder({ lines: [] }))
 
-    const error = await rejection(ordersApi.getOrder('ord-1008'))
+    // The next number the database would hand out: nothing was created under it.
+    const error = await rejection(ordersApi.getOrder(`ord-${String(NEXT_ORDER_NUMBER)}`))
 
     expect(error).toMatchObject({ status: 404 })
   })

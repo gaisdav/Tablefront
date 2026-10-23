@@ -25,6 +25,10 @@ The choices that shape this codebase, and why. Each one was made for a reason th
 - **Failures are part of the mock**, not an afterthought: latency, error rate and offline are conditions every handler honours, and the Dev tools panel is just a UI over them. That is how a reviewer, and the end-to-end tests, reach the unhappy paths.
 - **The demo database persists in `localStorage`** so tracking and "My orders" make sense across reloads; it is opt-in for the browser build only, so tests stay isolated and deterministic.
 
+## Order lifecycle
+
+- **The statuses an order can move to depend on how it is received.** A pickup goes `new → preparing → ready → completed`; a delivery goes `… → ready → out for delivery → completed`. One table in `src/domain/orderStatus.ts`, keyed by fulfillment, is the single source for the buttons, the mock API's `409`, the guest stepper and the validation of saved data; a pickup can never be "on the way", and nothing can be cancelled once the food is ready.
+
 ## UI
 
 - **No UI kit and no CSS framework.** The surface is small enough (about a dozen base components) that owning them is cheaper than fighting a kit's defaults, and accessibility behaviour (focus trap and stack, Escape, scroll lock, live regions, a real table next to the card list on phones) is deliberate and tested rather than inherited. Scoped CSS over design tokens, mobile first, light and dark.

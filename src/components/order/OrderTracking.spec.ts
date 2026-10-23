@@ -16,6 +16,16 @@ function track(orderId: string, pollIntervalMs = 20) {
   return wrapper
 }
 
+function placeDelivery() {
+  const item = menuItems.find((candidate) => candidate.available)
+  if (item === undefined) throw new Error('no dish')
+  return db.createOrder({
+    lines: [{ menuItemId: item.id, name: item.name, unitPriceCents: item.priceCents, quantity: 1 }],
+    fulfillment: 'delivery',
+    customer: { name: 'Anna', phone: '+49 30 1234567', address: 'Hauptstr. 1, Berlin' },
+  })
+}
+
 function placeOrder() {
   const item = menuItems.find((candidate) => candidate.available)
   if (item === undefined) throw new Error('no dish')
@@ -47,6 +57,46 @@ describe('OrderTracking', () => {
     expect(wrapper.text()).toContain(order.id)
     expect(wrapper.text()).toContain('Pickup at the restaurant')
     expect(wrapper.text()).toContain('2×')
+  })
+
+  it('shows a delivery with a step for the courier, and follows it onto the road', async () => {
+    const order = placeDelivery()
+    db.setOrderStatus(order.id, 'ready')
+    const wrapper = track(order.id)
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('Ready')
+    })
+    expect(wrapper.findAll('li.step').map((step) => step.get('.step__label').text())).toEqual([
+      'Received',
+      'Preparing',
+      'Ready',
+      'On the way',
+      'Completed',
+    ])
+
+    db.setOrderStatus(order.id, 'out_for_delivery')
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('On the way')
+    })
+
+    expect(stepsCurrent(wrapper)).toContain('On the way')
+    expect(wrapper.get('p.visually-hidden[role="status"]').text()).toBe('Order status: On the way.')
+  })
+
+  it('keeps asking while the order is on the way, and stops once it is completed', async () => {
+    const order = placeDelivery()
+    db.setOrderStatus(order.id, 'out_for_delivery')
+    const wrapper = track(order.id)
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('On the way')
+    })
+    expect(wrapper.text()).toContain('This page updates by itself')
+
+    db.setOrderStatus(order.id, 'completed')
+    await vi.waitFor(() => {
+      expect(heading(wrapper)).toBe('Completed')
+    })
+    expect(wrapper.text()).not.toContain('This page updates by itself')
   })
 
   it('follows the order as the kitchen moves it along, and announces each change', async () => {

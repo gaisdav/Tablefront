@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { delay, http as mswHttp, HttpResponse } from 'msw'
 import { effectScope, type EffectScope } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isOrderStatus, isRecord } from '@/domain/guards'
 import { useAdminOrders } from '@/composables/useAdminOrders'
 import { db } from '@/mocks/db'
@@ -43,6 +43,42 @@ beforeEach(async () => {
 
 afterEach(() => {
   for (const scope of scopes.splice(0)) scope.stop()
+})
+
+describe('useAdminOrders: moves that cannot be made', () => {
+  it('does not even ask the server to send a pickup out for delivery', async () => {
+    const requests = vi.fn()
+    const onRequest = ({ request }: { request: Request }) => {
+      if (request.method === 'PATCH') requests()
+    }
+    server.events.on('request:start', onRequest)
+    onTestFinished(() => {
+      server.events.removeListener('request:start', onRequest)
+    })
+    const result = board()
+    await loaded(result)
+    const pickup = db.listOrders('ready').find((order) => order.fulfillment === 'pickup')
+    if (pickup === undefined) throw new Error('no ready pickup in the fixtures')
+
+    await result.changeStatus(pickup.id, 'out_for_delivery')
+
+    expect(requests).not.toHaveBeenCalled()
+    expect(statusOf(result.orders, pickup.id)).toBe('ready')
+  })
+
+  it('lets a delivery that is ready go out for delivery', async () => {
+    const result = board()
+    await loaded(result)
+    db.setOrderStatus('ord-1004', 'ready')
+    await vi.waitFor(() => {
+      expect(statusOf(result.orders, 'ord-1004')).toBe('ready') // picked up by the next refresh
+    })
+
+    await result.changeStatus('ord-1004', 'out_for_delivery')
+
+    expect(statusOf(result.orders, 'ord-1004')).toBe('out_for_delivery')
+    expect(db.getOrder('ord-1004')?.status).toBe('out_for_delivery')
+  })
 })
 
 describe('useAdminOrders: loading', () => {

@@ -85,7 +85,12 @@ export function useAdminOrders(intervalMs = ADMIN_POLL_INTERVAL_MS) {
 
   async function changeStatus(id: string, status: OrderStatus): Promise<void> {
     const current = orders.value?.find((order) => order.id === id)
-    if (current === undefined || isSaving(id) || !canTransition(current.status, status)) return
+    if (
+      current === undefined ||
+      isSaving(id) ||
+      !canTransition(current.status, status, current.fulfillment)
+    )
+      return
 
     pending.set(id, { status, settledAfterRefresh: null })
     try {

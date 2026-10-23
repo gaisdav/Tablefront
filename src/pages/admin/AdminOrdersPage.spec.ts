@@ -6,6 +6,7 @@ import { server } from '@/mocks/server'
 import { startStaffSession } from '@/test/helpers'
 import { setViewport } from '@/test/media'
 import { mountAppAt, unmountApps } from '@/test/mountApp'
+import type { OrderStatus } from '@/types/domain'
 
 const rows = (wrapper: VueWrapper) => wrapper.findAll('button.row')
 const rowIds = (wrapper: VueWrapper) => rows(wrapper).map((row) => row.get('.row__id').text())
@@ -23,10 +24,17 @@ async function mountBoard(path = '/admin/orders') {
 }
 
 /** The id of an order with the given status in the fixtures. */
-function idWith(status: 'new' | 'preparing' | 'ready' | 'completed' | 'cancelled'): string {
+function idWith(status: OrderStatus): string {
   const order = db.listOrders(status)[0]
   if (order === undefined) throw new Error(`no ${status} order in the fixtures`)
   return order.id
+}
+
+/** Chooses the status filter whose label starts with `label` ("Preparing" for "Preparing (2)"). */
+async function pickFilter(wrapper: VueWrapper, label: string): Promise<void> {
+  const chip = wrapper.findAll('.chip').find((candidate) => candidate.text().startsWith(label))
+  if (chip === undefined) throw new Error(`no filter called ${label}`)
+  await chip.get('input').setValue()
 }
 
 /** Clicks a row and waits for the navigation that selecting it causes. */
@@ -67,6 +75,7 @@ describe('the orders board: the list', () => {
       `Received (${String(count('new'))})`,
       `Preparing (${String(count('preparing'))})`,
       `Ready (${String(count('ready'))})`,
+      `On the way (${String(count('out_for_delivery'))})`,
       `Completed (${String(count('completed'))})`,
       `Cancelled (${String(count('cancelled'))})`,
     ])
@@ -75,7 +84,7 @@ describe('the orders board: the list', () => {
   it('filters by status, and keeps the filter in the URL', async () => {
     const { wrapper, router } = await mountBoard()
 
-    await wrapper.findAll('.chip input')[2]?.setValue()
+    await pickFilter(wrapper, 'Preparing')
     await flushPromises()
 
     expect(router.currentRoute.value.query.status).toBe('preparing')
@@ -101,7 +110,7 @@ describe('the orders board: the list', () => {
     await wrapper.get('button.button').trigger('click') // refresh
     await flushPromises()
 
-    await wrapper.findAll('.chip input')[5]?.setValue()
+    await pickFilter(wrapper, 'Cancelled')
 
     await vi.waitFor(() => {
       expect(wrapper.text()).toContain('No cancelled orders')
@@ -227,6 +236,57 @@ describe('the orders board: details', () => {
 
     await choose(wrapper, idWith('completed'))
     expect(wrapper.find('aside.detail .actions button').exists()).toBe(false)
+  })
+})
+
+describe('the orders board: a delivery on its way', () => {
+  it('takes a delivery from preparing to completed through "out for delivery"', async () => {
+    setViewport(true)
+    const { wrapper } = await mountBoard()
+    const detailButtons = () => wrapper.findAll('aside.detail .actions button').map((b) => b.text())
+    const id = 'ord-1004' // a delivery, preparing
+    await choose(wrapper, id)
+    // One change at a time: each is pressed once the one before has been saved.
+    const press = async (saved: string) => {
+      await wrapper.findAll('aside.detail .actions button')[0]?.trigger('click')
+      await vi.waitFor(() => {
+        expect(toastTexts()).toContain(saved)
+      })
+    }
+
+    await press(`Order ${id} is now ready.`)
+    expect(detailButtons()).toEqual(['Out for delivery'])
+
+    await press(`Order ${id} is now on the way.`)
+    expect(detailButtons()).toEqual(['Mark as completed'])
+    expect(rowFor(wrapper, id).text()).toContain('On the way')
+
+    await press(`Order ${id} is now completed.`)
+    expect(detailButtons()).toEqual([])
+    expect(rowFor(wrapper, id).text()).toContain('Completed')
+    expect(db.getOrder(id)?.status).toBe('completed')
+  })
+
+  it('offers a ready pickup only "Mark as completed", and a delivery on its way the same', async () => {
+    setViewport(true)
+    const { wrapper } = await mountBoard()
+    const detailButtons = () => wrapper.findAll('aside.detail .actions button').map((b) => b.text())
+
+    await choose(wrapper, 'ord-1003') // a pickup, ready
+    expect(detailButtons()).toEqual(['Mark as completed'])
+
+    await choose(wrapper, 'ord-1008') // a delivery, out for delivery
+    expect(detailButtons()).toEqual(['Mark as completed'])
+  })
+
+  it('counts and filters the orders on their way', async () => {
+    const { wrapper, router } = await mountBoard()
+
+    await pickFilter(wrapper, 'On the way')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.status).toBe('out_for_delivery')
+    expect(rowIds(wrapper)).toEqual(['ord-1008'])
   })
 })
 

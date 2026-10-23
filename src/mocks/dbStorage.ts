@@ -1,3 +1,4 @@
+import { isStatusFor } from '@/domain/orderStatus'
 import { isAllergen, isFulfillment, isOrderStatus, isRecord } from '@/domain/guards'
 import { categories, menuItems as fixtureMenuItems } from '@/mocks/fixtures'
 import type { MenuItem, Order, OrderLine } from '@/types/domain'
@@ -77,6 +78,8 @@ function toOrder(value: unknown): Order | null {
     return null
   }
   if (fulfillment === 'delivery' ? !isText(address) : address !== undefined) return null
+  // "On the way" exists only for deliveries.
+  if (!isStatusFor(fulfillment, status)) return null
   return {
     id,
     lines: validLines,

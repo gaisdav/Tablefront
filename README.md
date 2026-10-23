@@ -56,7 +56,7 @@ Orders and menu edits are kept in `localStorage` (key `tablefront:mock-db`), so 
 
 ## What it does
 
-- **Guests:** menu with category chips, debounced search and filters in the URL; dish cards with a quantity stepper; a cart drawer that survives reloads and tells you when a price changed or a dish sold out; checkout with hand-written validation and server errors on the right fields; order tracking with a status stepper and polling; "My orders".
+- **Guests:** menu with category chips, debounced search and filters in the URL; dish cards with a quantity stepper; a cart drawer that survives reloads and tells you when a price changed or a dish sold out; checkout with hand-written validation and server errors on the right fields; order tracking with a status stepper (a delivery has an extra "On the way" step) and polling; "My orders".
 - **Staff:** sign-in with a guarded `/admin`; an orders board that refreshes itself and changes status optimistically (undone with an explanation if the server refuses); menu management with search, add, edit, delete and an unsaved-changes guard.
 - **Everywhere:** loading, error, empty and success states, a polite offline banner, an error boundary, keyboard and screen-reader support, light and dark themes, mobile-first layouts. See [accessibility and performance notes](docs/accessibility.md).
 
@@ -127,7 +127,7 @@ pnpm test:e2e                           # builds, serves on :4173, runs; about a
 pnpm test:e2e:ui                        # the interactive runner
 ```
 
-They cover the journeys that matter: browsing and filtering the menu; the card stepper and the cart drawer; checkout with validation and a server failure; tracking an order while staff move it along in another tab; "My orders"; staff sign-in, a status change and its rollback when the server refuses, and creating, editing and deleting a dish; a lost connection; and placing an order with the keyboard alone. Failure paths are reached through the Dev tools panel, as a reviewer would.
+They cover the journeys that matter: browsing and filtering the menu; the card stepper and the cart drawer; checkout with validation and a server failure; tracking an order while staff move it along in another tab; "My orders"; staff sign-in, a status change and its rollback when the server refuses, a delivery going out with the courier, and creating, editing and deleting a dish; a lost connection; and placing an order with the keyboard alone. Failure paths are reached through the Dev tools panel, as a reviewer would.
 
 Each test starts with an empty browser, waits for things to appear instead of sleeping, and fails on any console error or uncaught exception. On a failure a trace and a screenshot are kept (`test-results/`, uploaded as an artifact in CI; replay with `pnpm exec playwright show-trace <trace.zip>`).
 

@@ -34,7 +34,8 @@ defineProps<{ status: OrderStatus }>()
 }
 
 .badge--new .badge__dot,
-.badge--preparing .badge__dot {
+.badge--preparing .badge__dot,
+.badge--out_for_delivery .badge__dot {
   background: var(--color-accent);
 }
 

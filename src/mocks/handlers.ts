@@ -1,5 +1,5 @@
 import { http, HttpResponse, type PathParams } from 'msw'
-import { canTransition } from '@/domain/orderStatus'
+import { canTransition, statusLabel } from '@/domain/orderStatus'
 import { isOrderStatus, isRecord } from '@/domain/guards'
 import { applyConditions } from '@/mocks/conditions'
 import { db } from '@/mocks/db'
@@ -119,11 +119,12 @@ export const handlers = [
     const status = isRecord(body) ? body.status : undefined
     if (!isOrderStatus(status)) return validationFailed({ status: 'Unknown status' })
 
-    if (!canTransition(order.status, status)) {
+    if (!canTransition(order.status, status, order.fulfillment)) {
+      const kind = order.fulfillment === 'delivery' ? 'A delivery' : 'A pickup'
       return errorResponse(
         409,
         'invalid_transition',
-        `An order that is ${order.status} cannot become ${status}`,
+        `${kind} that is ${statusLabel(order.status).toLowerCase()} cannot become ${statusLabel(status).toLowerCase()}`,
       )
     }
     return HttpResponse.json(db.setOrderStatus(order.id, status))
