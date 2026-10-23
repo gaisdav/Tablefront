@@ -24,19 +24,19 @@ Gzipped sizes from a production build (`pnpm build`, mock API not included):
 
 | Chunk                           | Size     |
 | ------------------------------- | -------- |
-| Entry (Vue, router, Pinia, app) | 58.5 kB  |
+| Entry (Vue, router, Pinia, app) | 58.8 kB  |
 | Menu page                       | +6.5 kB  |
-| Checkout                        | +4.4 kB  |
-| My orders                       | +6.2 kB  |
-| Order tracking                  | +6.0 kB  |
+| Checkout                        | +4.3 kB  |
+| My orders                       | +6.3 kB  |
+| Order tracking                  | +6.2 kB  |
 | Not found                       | +0.3 kB  |
 | Admin login                     | +1.6 kB  |
 | Admin layout                    | +2.2 kB  |
-| Admin orders                    | +9.8 kB  |
+| Admin orders                    | +10.0 kB |
 | Admin menu                      | +10.1 kB |
 
 - **Route splitting.** Every page and the admin layout is its own chunk; a guest never downloads admin code (checked in the build output).
-- **The mock API is not in a real production build** (and neither is the Dev tools panel). The demo build (`VITE_ENABLE_MOCKS=true`) adds about 160 kB gzipped (MSW, the fixtures and the panel), loaded before the app mounts.
+- **The mock API is not in a real production build** (and neither is the Dev tools panel). The demo build (`VITE_ENABLE_MOCKS=true`) adds about 155 kB gzipped (MSW, the fixtures and the panel), loaded before the app mounts.
 - **Images** are `loading="lazy"` with `decoding="async"` and a fixed `width`/`height`, so the space is reserved.
 - **Layout shift**, measured in Chrome with a `layout-shift` observer on every page: the only shifts were on the menu page. The category chips changed height by 4 px when they arrived (the skeleton lacked their bottom padding), and the footer, visible under a short skeleton, was pushed out of view by the long list (up to 0.096, just under the "good" limit of 0.1). Both fixed: the chips' skeleton has the same padding, and the dish skeletons have the proportions of a real card (12 of them), so the footer is already below the fold. The menu now measures 0 at 375, 1200, 1440 and 1920 px wide. A window taller than the placeholder list would still see the footer move; that is what any content-driven page does.
 - **The offline banner floats** (`position: fixed`, above the Dev tools button's space) instead of pushing the page down, so nothing moves when the connection drops (page height measured before and after).

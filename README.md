@@ -58,7 +58,7 @@ Orders and menu edits are kept in `localStorage` (key `tablefront:mock-db`), so 
 
 - **Guests:** menu with category chips, debounced search and filters in the URL; dish cards with a quantity stepper; a cart drawer that survives reloads and tells you when a price changed or a dish sold out; checkout with hand-written validation and server errors on the right fields; order tracking with a status stepper (a delivery has an extra "On the way" step) and polling; "My orders".
 - **Staff:** sign-in with a guarded `/admin`; an orders board that refreshes itself and changes status optimistically (undone with an explanation if the server refuses); menu management with search, add, edit, delete and an unsaved-changes guard.
-- **Everywhere:** loading, error, empty and success states, a polite offline banner, an error boundary, keyboard and screen-reader support, light and dark themes, mobile-first layouts. See [accessibility and performance notes](docs/accessibility.md).
+- **Everywhere:** loading, error, empty and success states, a polite offline banner, an error boundary, keyboard support and screen-reader friendly markup (labels, live regions, focus moves), light and dark themes, mobile-first layouts. See [accessibility and performance notes](docs/accessibility.md).
 
 ## Architecture
 
@@ -93,7 +93,16 @@ Why these choices, and what would change with a real backend: [docs/DECISIONS.md
 | `src/devtools`    | The Dev tools panel (loaded only when the mock API is)                                                                       |
 | `src/styles`      | Reset, design tokens (light and dark), base styles                                                                           |
 | `src/test`        | Test setup (MSW server) and helpers                                                                                          |
-| `docs`            | Accessibility notes, decisions, and one description per pull request (`docs/pr`)                                             |
+| `src/auth`        | Connects the session to the router and the API client (sign-in guard, 401 handling)                                          |
+| `src/types`       | Domain types and the API's request and response shapes                                                                       |
+| `e2e`             | Playwright end-to-end tests and their helpers                                                                                |
+| `scripts`         | `check-image.sh`: checks a running Docker image (used by CI)                                                                 |
+| `docs`            | Accessibility notes, decisions, screenshots, and one description per pull request (`docs/pr`)                                |
+
+## Deploy
+
+- **Static hosting:** `netlify.toml` builds the demo (`pnpm build` with the mock API on) and sets the single-page-app fallback and cache headers; the live demo above is deployed this way.
+- **Docker:** the image is the same demo behind nginx, running as a non-root user on port 8080 (`docker compose` maps it to 8080). `scripts/check-image.sh` checks what it serves.
 
 ## Scripts
 
@@ -110,8 +119,9 @@ Why these choices, and what would change with a real backend: [docs/DECISIONS.md
 | `pnpm test`         | Vitest, single run                                 |
 | `pnpm test:watch`   | Vitest in watch mode                               |
 | `pnpm test:e2e`     | Playwright end-to-end tests (see below)            |
+| `pnpm test:e2e:ui`  | The same, in Playwright's interactive runner       |
 
-CI runs formatting, lint, types, tests and the build on every pull request, builds the Docker image and checks that it serves the app, and runs the end-to-end tests in a separate job.
+CI runs formatting, lint, types, tests and the build on every pull request, builds the Docker image and checks what it serves (`scripts/check-image.sh`), and runs the end-to-end tests in a separate job.
 
 ### Tests
 
